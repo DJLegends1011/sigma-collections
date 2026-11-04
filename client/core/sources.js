@@ -2,7 +2,7 @@
 // Shape (what collections.register-source takes):
 //   { id, label, icon?, providerId?, sorts?: [{ value, label }], search?: boolean,
 //     list({ page, sort, query }) -> { items: CollectionItem[], hasMore, totalPages? },
-//     get(collectionId, { page }) -> { collection: CollectionItem, members: Member[], hasMore },
+//     get(collectionId, { page }) -> { collection: CollectionItem, members: Member[], hasMore, note? (shown above the members) },
 //     available?() -> true | string (a reason it cannot run right now) }
 // CollectionItem: { id, title, description?, curator?: { name, url?, avatar? }, count?, covers?: string[],
 //                   nsfw?, updatedAt?, url? }

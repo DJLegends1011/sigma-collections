@@ -2,6 +2,8 @@
 // (/collections/<uuid>_<slug>?page=). Pure string work so the server-free tests and the page agree.
 
 const ORIGIN = 'https://jannyai.com';
+// a collection page lists at most this many characters, a random sample of a bigger collection, with no paging
+// (?page= is ignored: the same 250, reshuffled), so the site itself shows no more than this
 export const JANNY_PAGE_SIZE = 250;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
@@ -132,7 +134,8 @@ export function parseCollectionPage(html) {
     return {
         collection: { title, curator, description: descM ? text(descM[1]) : '', updatedAt: updated ? updated[1] : '' },
         members,
-        hasMore: members.length >= JANNY_PAGE_SIZE,
+        hasMore: false,
+        sampled: members.length >= JANNY_PAGE_SIZE,
     };
 }
 

@@ -46,6 +46,7 @@
 .coll-detail-head { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .coll-detail-text { display: flex; flex-direction: column; gap: 6px; flex: 1 1 260px; }
 .coll-detail-desc { margin: 0; opacity: .8; white-space: pre-line; overflow-wrap: anywhere; max-height: 9em; overflow: auto; }
+.coll-note { margin: 0; display: flex; gap: 8px; align-items: baseline; font-size: .88rem; border-color: rgba(234, 179, 8, .35); }
 .coll-back { align-self: flex-start; }
 
 .coll-job { display: flex; flex-direction: column; gap: 8px; }

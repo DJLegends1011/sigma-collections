@@ -18,6 +18,8 @@ Browse curated character collections from **JannyAI** and **DataCat**, plus any 
 - **DataCat:** nothing. The server half opens an anonymous DataCat session, like Σ's own DataCat provider does, and only reads the community collections. To preview or import DataCat characters, turn the DataCat site on under **Settings > Online** (it's off by default in Σ).
 - **JannyAI:** the **Hosted Browser** (Settings > Online > Hosted Browser), the same one Σ's JannyAI provider uses for character pages. JannyAI's collection pages are behind Cloudflare too.
 
+**JannyAI's 250 limit:** a JannyAI collection page lists at most 250 characters. For a bigger collection, that's a random 250 that changes on every visit, and the site has no way to page past it. The view says so, and Import all brings in the 250 it got. Running it again later can add more of them to the same playlist.
+
 ## How the JannyAI part works (and why it might break)
 
 Σ's Hosted Browser only lets each registered "consumer" fetch under one path on one site. The built-in `jannyai` consumer is locked to `/characters/`, and extensions have no official way to register their own yet (`browser-service.js` says extension consumers are coming "later").

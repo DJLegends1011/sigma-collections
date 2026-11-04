@@ -69,9 +69,12 @@ export function jannySource(ctx) {
             const { items, totalPages } = parseCollectionList(await fetchPage(jannyListPath({ page, sort })));
             return { items, hasMore: page < totalPages, totalPages };
         },
-        async get(id, { page = 1 } = {}) {
-            const r = parseCollectionPage(await fetchPage(jannyCollectionPath(id, { page })));
-            return { collection: { id, ...r.collection }, members: r.members, hasMore: r.hasMore };
+        async get(id) {
+            const r = parseCollectionPage(await fetchPage(jannyCollectionPath(id)));
+            return {
+                collection: { id, ...r.collection }, members: r.members, hasMore: false,
+                note: r.sampled ? `JannyAI only shows a random ${r.members.length} characters of a collection this big; refreshing shows a different set.` : '',
+            };
         },
         async probe() { status = null; await ensure().catch(() => {}); return status; },
     };

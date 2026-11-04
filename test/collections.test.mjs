@@ -49,12 +49,14 @@ test('janny: one collection page', () => {
     assert.ok(m.avatar.startsWith('https://image.jannyai.com/'));
 });
 
-test('janny: a full page of 250 says there may be more', () => {
+test('janny: a full page of 250 is a sample, with no more pages', () => {
     const card = (i) => `<a data-astro-prefetch="hover" href="/characters/00000000-0000-4000-8000-${String(i).padStart(12, '0')}_character-c${i}" class="x"><h5>C${i}</h5></a>`;
     const html = `<h1>Big <span>by</span></h1>${Array.from({ length: JANNY_PAGE_SIZE }, (_, i) => card(i)).join('')}`;
     const r = parseCollectionPage(html);
     assert.equal(r.members.length, 250);
-    assert.equal(r.hasMore, true);
+    assert.equal(r.hasMore, false, 'JannyAI ignores ?page= on a collection');
+    assert.equal(r.sampled, true);
+    assert.equal(parseCollectionPage(fx('janny-collection.html')).sampled, false);
 });
 
 test('janny: paths stay inside /collections/', () => {

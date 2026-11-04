@@ -67,10 +67,19 @@ export function mountView(el, ctx, registry) {
         try {
             const r = await s.get(id, { page: 1 });
             if (my !== st.token || st.detail?.id !== id) return;
+            const fresh = cleanCollection({ id, ...(r.collection || {}) }) || {};
+            const merged = { ...(seed || {}) };
+            // the collection's own page may say less than its list card did: keep the card's covers, url, count
+            for (const [k, v] of Object.entries(fresh)) {
+                const empty = v == null || v === '' || (Array.isArray(v) && !v.length);
+                if (!empty || !(k in merged)) merged[k] = v;
+            }
+            merged.count = r.total ?? fresh.count ?? seed?.count ?? null;
             Object.assign(st.detail, {
-                collection: { ...(seed || {}), ...(cleanCollection({ id, ...(r.collection || {}) }) || {}), count: r.total ?? r.collection?.count ?? seed?.count ?? null },
+                collection: merged,
                 members: (r.members || []).map(m => cleanMember(m, s.providerId)).filter(Boolean),
                 hasMore: !!r.hasMore,
+                note: typeof r.note === 'string' ? r.note.slice(0, 300) : '',
                 loading: false,
             });
             await probeOwned(st.detail.members);
@@ -186,7 +195,7 @@ export function mountView(el, ctx, registry) {
         }
         const ok = await CoreAPI.showConfirm?.({
             title: 'Import collection',
-            message: `Import ${toImport.length} new character${toImport.length === 1 ? '' : 's'} (${have.length} already in your library) and put all ${toImport.length + have.length} in the playlist "${name}"?${locked.length ? ` ${locked.length} whose creators turned downloads off are skipped.` : ''}`,
+            message: `Import ${toImport.length} new character${toImport.length === 1 ? '' : 's'} (${have.length} already in your library) and put all ${toImport.length + have.length} in the playlist "${name}"?${locked.length ? ` ${locked.length} whose creators turned downloads off are skipped.` : ''}${d.note ? ` ${d.note}` : ''}`,
             confirmLabel: 'Import all',
             cancelLabel: 'Cancel',
         });
@@ -354,6 +363,7 @@ export function mountView(el, ctx, registry) {
                 ${c.url ? `<a class="cl-btn" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open on ${esc(d.source.label)}</a>` : ''}
                 <label class="coll-switch"><input type="checkbox" class="cl-switch-input" data-act="nsfw"${showNsfw() ? ' checked' : ''}><span class="cl-switch" aria-hidden="true"></span><span>Show NSFW</span></label>
             </div>
+            ${d.note ? `<p class="coll-card coll-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> ${esc(d.note)}</p>` : ''}
             ${jobHtml()}
         </header>`;
         if (d.error) return `${head}<div class="coll-card coll-error"><p>${esc(d.error)}</p><button type="button" class="cl-btn" data-act="reopen">Try again</button></div>`;
