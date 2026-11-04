@@ -1,0 +1,165 @@
+{
+ "success": true,
+ "preview": true,
+ "count": 2,
+ "curations": [
+  {
+   "slug": "curation-u90c9a20f-c00f-4b8b-8415-99411b4eda13",
+   "title": "✉️ REQUESTED",
+   "description": "Bots that ppl requested me (mid.nqight) to make  || Hit ↗️!",
+   "descriptionSource": "folder",
+   "accent": "candy",
+   "position": 1,
+   "discussion": {
+    "kind": "curation",
+    "id": "117550bd-a6de-4231-afc7-0c765a45a783:curation-f18898"
+   },
+   "curator": {
+    "userUuid": "117550bd-a6de-4231-afc7-0c765a45a783",
+    "username": "mid.nqight",
+    "displayName": "mid.nqight",
+    "profileAvatarUrl": "https://media.datacat.run/profile-avatars/117550bd-a6de-4231-afc7-0c765a45a783/735197a2-86a5-49b6-938c-fb590f849c07-medium.webp"
+   },
+   "characterCount": 10,
+   "creatorCount": 1,
+   "matureCharacterCount": 10,
+   "containsMatureContent": true,
+   "createdAt": "2026-10-30T21:42:37.800Z",
+   "updatedAt": "2026-10-30T22:50:15.732Z",
+   "covers": [
+    {
+     "characterId": "5a5ba850-07a6-4ae7-81ad-86567feee232",
+     "name": "Akkurone",
+     "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp"
+    },
+    {
+     "characterId": "66e620a1-c543-4737-a5ca-d05fbc69d5f8",
+     "name": "ClownPierce ",
+     "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp"
+    },
+    {
+     "characterId": "efa0b6c5-0ee1-443b-878b-3e5546923f9b",
+     "name": "Div_y",
+     "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp"
+    },
+    {
+     "characterId": "020d5d33-a038-4b35-9e9b-bd90da88d5bb",
+     "name": "Vi",
+     "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/2a/2ad46e74-a9f2-44d7-9852-031f56b8776a/604f9e7df1e26987/card.webp"
+    }
+   ],
+   "tags": [
+    {
+     "id": 15,
+     "name": "AnyPOV",
+     "slug": "anypov",
+     "count": 10
+    },
+    {
+     "id": 22,
+     "name": "Fictional",
+     "slug": "fictional",
+     "count": 10
+    },
+    {
+     "id": 72,
+     "name": "Game",
+     "slug": "game",
+     "count": 10
+    },
+    {
+     "id": 4,
+     "name": "Male",
+     "slug": "male",
+     "count": 10
+    },
+    {
+     "id": 92874,
+     "name": "minecraft",
+     "slug": "minecraft",
+     "count": 10
+    },
+    {
+     "id": 2,
+     "name": "NSFW",
+     "slug": "nsfw",
+     "count": 10
+    }
+   ]
+  },
+  {
+   "slug": "curation-u6a9542f1-436a-4045-bdbb-ac89acbe50c9",
+   "title": "👀 Author's Recs",
+   "description": "Bots that I'm proud of but are slightly underrated",
+   "descriptionSource": "folder",
+   "accent": "signal",
+   "position": 2,
+   "discussion": {
+    "kind": "curation",
+    "id": "117550bd-a6de-4231-afc7-0c765a45a783:curation-f18905"
+   },
+   "curator": {
+    "userUuid": "117550bd-a6de-4231-afc7-0c765a45a783",
+    "username": "mid.nqight",
+    "displayName": "mid.nqight",
+    "profileAvatarUrl": "https://media.datacat.run/profile-avatars/117550bd-a6de-4231-afc7-0c765a45a783/735197a2-86a5-49b6-938c-fb590f849c07-medium.webp"
+   },
+   "characterCount": 2,
+   "creatorCount": 1,
+   "matureCharacterCount": 2,
+   "containsMatureContent": true,
+   "createdAt": "2026-10-30T22:42:44.163Z",
+   "updatedAt": "2026-10-30T22:48:01.269Z",
+   "covers": [
+    {
+     "characterId": "5a5ba850-07a6-4ae7-81ad-86567feee232",
+     "name": "Akkurone",
+     "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp"
+    },
+    {
+     "characterId": "a8e84f35-31f0-4949-bc36-104b93a28e46",
+     "name": "Logan",
+     "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/c5/c5d3f87a-7104-48a6-b3c4-c6780e391e2f/33b8e7ff20b2ec15/card.webp"
+    }
+   ],
+   "tags": [
+    {
+     "id": 15,
+     "name": "AnyPOV",
+     "slug": "anypov",
+     "count": 2
+    },
+    {
+     "id": 22,
+     "name": "Fictional",
+     "slug": "fictional",
+     "count": 2
+    },
+    {
+     "id": 72,
+     "name": "Game",
+     "slug": "game",
+     "count": 2
+    },
+    {
+     "id": 4,
+     "name": "Male",
+     "slug": "male",
+     "count": 2
+    },
+    {
+     "id": 2,
+     "name": "NSFW",
+     "slug": "nsfw",
+     "count": 2
+    },
+    {
+     "id": 43686,
+     "name": "alternateuniverse",
+     "slug": "alternateuniverse",
+     "count": 1
+    }
+   ]
+  }
+ ]
+}

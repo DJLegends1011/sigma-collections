@@ -1,0 +1,361 @@
+{
+ "success": true,
+ "slug": "curation-u90c9a20f-c00f-4b8b-8415-99411b4eda13",
+ "title": "✉️ REQUESTED",
+ "total": 10,
+ "limit": 1000,
+ "list": [
+  {
+   "characterId": "5a5ba850-07a6-4ae7-81ad-86567feee232",
+   "name": "Akkurone || Legends SMP",
+   "creatorId": "199cfc5e-25ba-4588-966f-be24ad00d24c",
+   "creatorName": "mid.nqight",
+   "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp",
+   "avatarSourceMode": "self",
+   "avatar_source_mode": "self",
+   "avatarSelfArchiveUrl": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp",
+   "avatar_self_archive_url": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp",
+   "avatarVariantUrls": {
+    "thumb": "https://media.datacat.run/prod-media/variants/source-avatar/v1/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/thumb.webp",
+    "card": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp",
+    "hero": "https://media.datacat.run/prod-media/variants/source-avatar/v1/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/hero.webp",
+    "original": "https://media.datacat.run/media/archive/v1/alpha/bot-avatars/3ZwBzuRCzThWgYC5rAX39.webp/9ed54c2ac23551d645980dfd728d3828893f5c1c79f83a12a50b23085fc1d6be"
+   },
+   "avatar_variant_urls": {
+    "thumb": "https://media.datacat.run/prod-media/variants/source-avatar/v1/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/thumb.webp",
+    "card": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp",
+    "hero": "https://media.datacat.run/prod-media/variants/source-avatar/v1/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/hero.webp",
+    "original": "https://media.datacat.run/media/archive/v1/alpha/bot-avatars/3ZwBzuRCzThWgYC5rAX39.webp/9ed54c2ac23551d645980dfd728d3828893f5c1c79f83a12a50b23085fc1d6be"
+   },
+   "avatarDisplayUrl": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp",
+   "avatar_display_url": "https://media.datacat.run/prod-media/variants/source-avatar/v2/cd/cd871328-fbd1-49f6-afdc-9251542a241a/a10a627e9b7e5773/card.webp",
+   "isNsfw": true,
+   "isPublic": true,
+   "appearOnPublicFeed": true,
+   "primaryContentSourceKind": "janitor_core",
+   "primary_content_source_kind": "janitor_core",
+   "tags": [
+    {
+     "id": 1,
+     "name": "👨 Male",
+     "slug": "male",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Male characters"
+    },
+    {
+     "id": 6,
+     "name": "📚 Fictional",
+     "slug": "fictional",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Fictional characters"
+    },
+    {
+     "id": 8,
+     "name": "🎮 Game",
+     "slug": "game",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Characters originating from video games"
+    },
+    {
+     "id": 42,
+     "name": "👤 AnyPOV",
+     "slug": "anypov",
+     "created_at": "2024-01-27T18:21:38.960433+00:00",
+     "description": "Character is not specific in the gender or orientation of the User"
+    }
+   ],
+   "customTags": [
+    "legendsmp",
+    "PvP",
+    "morallygrey",
+    "Minecraft"
+   ],
+   "allowProxy": true,
+   "allow_proxy": true,
+   "createdAt": "2026-10-26T15:53:51.939Z",
+   "sourcePostedAt": null,
+   "extractedAt": "2026-10-30T20:16:40.450Z",
+   "isFullyExtractedInDb": true,
+   "hasPersistedCharacterInDb": true,
+   "isPublicInDb": true,
+   "token_counts": {
+    "total_tokens": 1296,
+    "scenario_tokens": 164,
+    "personality_tokens": 802,
+    "first_message_tokens": 330,
+    "example_dialog_tokens": 0,
+    "permanent_tokens": null
+   },
+   "tokenCounts": {
+    "total_tokens": 1296,
+    "scenario_tokens": 164,
+    "personality_tokens": 802,
+    "first_message_tokens": 330,
+    "example_dialog_tokens": 0,
+    "permanent_tokens": null
+   },
+   "totalTokens": 1296,
+   "total_tokens": 1296,
+   "creatorVerified": false,
+   "creator_verified": false,
+   "creatorVerifiedAt": null,
+   "creator_verified_at": null,
+   "creatorOwnerUserUuid": null,
+   "creator_owner_user_uuid": null,
+   "creatorOwnerUsername": "",
+   "creator_owner_username": "",
+   "creatorOwnerUserType": null,
+   "creator_owner_user_type": null,
+   "download_access_policy": null,
+   "downloads_disabled": false,
+   "creator_lifecycle_status": "active",
+   "creator_chat_download_policy": "redirect",
+   "creator_redirect_url": "https://janitorai.com/profiles/199cfc5e-25ba-4588-966f-be24ad00d24c_profile-of-mid-nqight",
+   "creator_control_status_line": "Chats and downloads redirected by creator request",
+   "creator_definition_restricted": true,
+   "addedToCurationAt": "2026-10-30T22:09:40.999Z"
+  },
+  {
+   "characterId": "66e620a1-c543-4737-a5ca-d05fbc69d5f8",
+   "name": "ClownPierce || Whitepine",
+   "creatorId": "199cfc5e-25ba-4588-966f-be24ad00d24c",
+   "creatorName": "mid.nqight",
+   "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp",
+   "avatarSourceMode": "self",
+   "avatar_source_mode": "self",
+   "avatarSelfArchiveUrl": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp",
+   "avatar_self_archive_url": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp",
+   "avatarVariantUrls": {
+    "thumb": "https://media.datacat.run/prod-media/variants/source-avatar/v1/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/thumb.webp",
+    "card": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp",
+    "hero": "https://media.datacat.run/prod-media/variants/source-avatar/v1/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/hero.webp",
+    "original": "https://media.datacat.run/media/archive/v1/alpha/bot-avatars/SrfJu-VkYSLatlUz4aIyy.webp/9ccc86017f25b1dfbc0e5b8909420cdfd9f37397f37e687a2e389bd7d7ecead8"
+   },
+   "avatar_variant_urls": {
+    "thumb": "https://media.datacat.run/prod-media/variants/source-avatar/v1/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/thumb.webp",
+    "card": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp",
+    "hero": "https://media.datacat.run/prod-media/variants/source-avatar/v1/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/hero.webp",
+    "original": "https://media.datacat.run/media/archive/v1/alpha/bot-avatars/SrfJu-VkYSLatlUz4aIyy.webp/9ccc86017f25b1dfbc0e5b8909420cdfd9f37397f37e687a2e389bd7d7ecead8"
+   },
+   "avatarDisplayUrl": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp",
+   "avatar_display_url": "https://media.datacat.run/prod-media/variants/source-avatar/v2/f4/f4cf0fc8-f1b6-4668-8f3f-30f2a220ad19/5053533fab86f0e7/card.webp",
+   "isNsfw": true,
+   "isPublic": true,
+   "appearOnPublicFeed": true,
+   "primaryContentSourceKind": "janitor_core",
+   "primary_content_source_kind": "janitor_core",
+   "tags": [
+    {
+     "id": 1,
+     "name": "👨 Male",
+     "slug": "male",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Male characters"
+    },
+    {
+     "id": 6,
+     "name": "📚 Fictional",
+     "slug": "fictional",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Fictional characters"
+    },
+    {
+     "id": 8,
+     "name": "🎮 Game",
+     "slug": "game",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Characters originating from video games"
+    },
+    {
+     "id": 42,
+     "name": "👤 AnyPOV",
+     "slug": "anypov",
+     "created_at": "2024-01-27T18:21:38.960433+00:00",
+     "description": "Character is not specific in the gender or orientation of the User"
+    },
+    {
+     "id": 43,
+     "name": "💔 Angst",
+     "slug": "angst",
+     "created_at": "2024-01-27T18:22:14.826085+00:00",
+     "description": "Sad or emotional content that is made to evoke emotions and feelings within the User"
+    },
+    {
+     "id": 49,
+     "name": "🕊🗡 Dead Dove",
+     "slug": "deaddove",
+     "created_at": "2024-01-27T18:24:34.231372+00:00",
+     "description": "A warning tag that states that the content within the bot are extreme and fully contain and use the the listed Content warnings to their full extent. That any users that chat with this bot are doing so with the understanding of the content present"
+    }
+   ],
+   "customTags": [
+    "whitepine",
+    "drama",
+    "exmilitary",
+    "Minecraft"
+   ],
+   "allowProxy": true,
+   "allow_proxy": true,
+   "createdAt": "2026-10-15T05:47:41.503Z",
+   "sourcePostedAt": null,
+   "extractedAt": "2026-10-30T20:13:48.995Z",
+   "isFullyExtractedInDb": true,
+   "hasPersistedCharacterInDb": true,
+   "isPublicInDb": true,
+   "token_counts": {
+    "total_tokens": 1339,
+    "scenario_tokens": 192,
+    "personality_tokens": 763,
+    "first_message_tokens": 384,
+    "example_dialog_tokens": 0,
+    "permanent_tokens": null
+   },
+   "tokenCounts": {
+    "total_tokens": 1339,
+    "scenario_tokens": 192,
+    "personality_tokens": 763,
+    "first_message_tokens": 384,
+    "example_dialog_tokens": 0,
+    "permanent_tokens": null
+   },
+   "totalTokens": 1339,
+   "total_tokens": 1339,
+   "creatorVerified": false,
+   "creator_verified": false,
+   "creatorVerifiedAt": null,
+   "creator_verified_at": null,
+   "creatorOwnerUserUuid": null,
+   "creator_owner_user_uuid": null,
+   "creatorOwnerUsername": "",
+   "creator_owner_username": "",
+   "creatorOwnerUserType": null,
+   "creator_owner_user_type": null,
+   "download_access_policy": null,
+   "downloads_disabled": false,
+   "creator_lifecycle_status": "active",
+   "creator_chat_download_policy": "redirect",
+   "creator_redirect_url": "https://janitorai.com/profiles/199cfc5e-25ba-4588-966f-be24ad00d24c_profile-of-mid-nqight",
+   "creator_control_status_line": "Chats and downloads redirected by creator request",
+   "creator_definition_restricted": true,
+   "addedToCurationAt": "2026-10-30T22:09:34.282Z"
+  },
+  {
+   "characterId": "efa0b6c5-0ee1-443b-878b-3e5546923f9b",
+   "name": "Div_y || Whitepine",
+   "creatorId": "199cfc5e-25ba-4588-966f-be24ad00d24c",
+   "creatorName": "mid.nqight",
+   "avatar": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp",
+   "avatarSourceMode": "self",
+   "avatar_source_mode": "self",
+   "avatarSelfArchiveUrl": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp",
+   "avatar_self_archive_url": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp",
+   "avatarVariantUrls": {
+    "thumb": "https://media.datacat.run/prod-media/variants/source-avatar/v1/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/thumb.webp",
+    "card": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp",
+    "hero": "https://media.datacat.run/prod-media/variants/source-avatar/v1/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/hero.webp",
+    "original": "https://media.datacat.run/media/archive/v1/alpha/bot-avatars/s8qwR-1XzJgDqE808xBVa.webp/0f92563120bd06777558c72964985e09189d49436f683091cc10b701c3715372"
+   },
+   "avatar_variant_urls": {
+    "thumb": "https://media.datacat.run/prod-media/variants/source-avatar/v1/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/thumb.webp",
+    "card": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp",
+    "hero": "https://media.datacat.run/prod-media/variants/source-avatar/v1/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/hero.webp",
+    "original": "https://media.datacat.run/media/archive/v1/alpha/bot-avatars/s8qwR-1XzJgDqE808xBVa.webp/0f92563120bd06777558c72964985e09189d49436f683091cc10b701c3715372"
+   },
+   "avatarDisplayUrl": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp",
+   "avatar_display_url": "https://media.datacat.run/prod-media/variants/source-avatar/v2/09/09d5cfa2-7e44-4537-b143-455f69e95abb/f4e75c6903210e50/card.webp",
+   "isNsfw": true,
+   "isPublic": true,
+   "appearOnPublicFeed": true,
+   "primaryContentSourceKind": "janitor_core",
+   "primary_content_source_kind": "janitor_core",
+   "tags": [
+    {
+     "id": 1,
+     "name": "👨 Male",
+     "slug": "male",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Male characters"
+    },
+    {
+     "id": 6,
+     "name": "📚 Fictional",
+     "slug": "fictional",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Fictional characters"
+    },
+    {
+     "id": 8,
+     "name": "🎮 Game",
+     "slug": "game",
+     "created_at": "2023-04-04T09:18:30.194451+00:00",
+     "description": "Characters originating from video games"
+    },
+    {
+     "id": 42,
+     "name": "👤 AnyPOV",
+     "slug": "anypov",
+     "created_at": "2024-01-27T18:21:38.960433+00:00",
+     "description": "Character is not specific in the gender or orientation of the User"
+    },
+    {
+     "id": 51,
+     "name": "🔦 Horror",
+     "slug": "horror",
+     "created_at": "2024-01-27T18:25:05.862783+00:00",
+     "description": "Scary or creepy content that could be seen as disturbing or possibly upsetting"
+    }
+   ],
+   "customTags": [
+    "whitepine",
+    "drama",
+    "servant",
+    "butler",
+    "Minecraft"
+   ],
+   "allowProxy": true,
+   "allow_proxy": true,
+   "createdAt": "2026-09-03T13:26:54.346Z",
+   "sourcePostedAt": null,
+   "extractedAt": "2026-09-06T09:10:19.116Z",
+   "isFullyExtractedInDb": true,
+   "hasPersistedCharacterInDb": true,
+   "isPublicInDb": true,
+   "token_counts": {
+    "total_tokens": 1153,
+    "scenario_tokens": 208,
+    "personality_tokens": 634,
+    "first_message_tokens": 311,
+    "example_dialog_tokens": 0,
+    "permanent_tokens": null
+   },
+   "tokenCounts": {
+    "total_tokens": 1153,
+    "scenario_tokens": 208,
+    "personality_tokens": 634,
+    "first_message_tokens": 311,
+    "example_dialog_tokens": 0,
+    "permanent_tokens": null
+   },
+   "totalTokens": 1153,
+   "total_tokens": 1153,
+   "creatorVerified": false,
+   "creator_verified": false,
+   "creatorVerifiedAt": null,
+   "creator_verified_at": null,
+   "creatorOwnerUserUuid": null,
+   "creator_owner_user_uuid": null,
+   "creatorOwnerUsername": "",
+   "creator_owner_username": "",
+   "creatorOwnerUserType": null,
+   "creator_owner_user_type": null,
+   "download_access_policy": null,
+   "downloads_disabled": false,
+   "creator_lifecycle_status": "active",
+   "creator_chat_download_policy": "redirect",
+   "creator_redirect_url": "https://janitorai.com/profiles/199cfc5e-25ba-4588-966f-be24ad00d24c_profile-of-mid-nqight",
+   "creator_control_status_line": "Chats and downloads redirected by creator request",
+   "creator_definition_restricted": true,
+   "addedToCurationAt": "2026-10-30T22:09:26.019Z"
+  }
+ ]
+}
