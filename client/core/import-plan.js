@@ -34,7 +34,12 @@ export function chunk(arr, n) {
 }
 
 // a playlist name Σ accepts, from a collection title
-export function playlistNameFor(title, sourceLabel) {
+// cut the title, never the suffix; n > 1 adds " #n" for a name some other playlist already has
+export function playlistNameFor(title, sourceLabel, n = 1) {
     const base = String(title || '').replace(/\s+/g, ' ').trim() || 'Collection';
-    return `${base} (${sourceLabel})`.slice(0, 100);
+    const suf = ` (${sourceLabel})${n > 1 ? ` #${n}` : ''}`;
+    return `${base.slice(0, Math.max(1, 100 - suf.length)).trim()}${suf}`;
 }
+
+// the key a collection's playlist is remembered under
+export const collectionKey = (sourceId, collectionId) => `${sourceId}:${collectionId}`;

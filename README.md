@@ -9,9 +9,13 @@ Browse curated character collections from **JannyAI** and **DataCat**, plus any 
   - JannyAI: Recently updated, Popular, paged like the site.
 - **A collection** shows its curator, description, covers and every character, with an **In Library** badge on the ones you already have (matched by the site link Σ keeps on the character).
 - **Preview** opens Σ's own preview window for that site. **Import** brings the character in through that site's importer, just like the Online tab.
-- **Import all into a playlist** reads the whole collection, skips what you already own, imports the rest one by one (with a progress bar and **Stop**), then puts every character in a playlist named `<collection> (<site>)`. If that playlist already exists, the characters are added to it.
+- **Import all into a playlist** reads the whole collection, skips what you already own, imports the rest one by one (with a progress bar and **Stop**), then puts every character in the collection's own playlist, named `<collection> (<site>)`.
+  - Running it again later reuses that same playlist and only brings in what's new.
+  - A playlist of yours that happens to have the same name is never touched; the new one gets a `#2`.
+  - With **Show NSFW** off, hidden NSFW characters are left out of the import too.
+  - Characters whose site is switched off under Settings > Online are skipped by name.
 - **Creator opt-outs are respected.** DataCat characters whose creators turned downloads off show **Downloads off** and only link to the site. They are never imported.
-- **Show NSFW** hides collections and characters flagged NSFW when it's switched off.
+- **Show NSFW** hides collections and characters flagged NSFW when it's switched off. JannyAI's collection list carries no NSFW flag, so there it only applies to the characters inside a collection.
 
 ## What it needs
 
@@ -25,6 +29,8 @@ Browse curated character collections from **JannyAI** and **DataCat**, plus any 
 Σ's Hosted Browser only lets each registered "consumer" fetch under one path on one site. The built-in `jannyai` consumer is locked to `/characters/`, and extensions have no official way to register their own yet (`browser-service.js` says extension consumers are coming "later").
 
 Until then, this extension's server half loads Σ's internal `server/services/browser-service.js` and registers a `jannyai-collections` consumer for `https://jannyai.com/collections/`. Σ's own guards still apply: only GET/POST, the path must stay under `/collections/` (`../` escapes are refused), and on a multi-user server the managed browser stays owner-only.
+
+The consumer is registered once for the whole server, so while the extension is installed the route will fetch `/collections/` pages for any signed-in account, even one that hasn't switched Collections on. It is read-only and stays under `/collections/`.
 
 If a Σ update moves that internal function, only the JannyAI source switches off ("unavailable in this Σ version"). DataCat keeps working. A feature request for an official door has been filed with the Σ developer.
 
@@ -53,6 +59,8 @@ try { await add(); } catch { ctx.events.on('ext:collections:ready', add); }   //
 ```
 
 - `importId` is what `character.import { provider, id }` takes for your provider. It defaults to `charId`.
+- A source id belongs to whoever registered it first. You can't replace or remove another extension's source, or the built-in DataCat and JannyAI ones.
+- Unregister your source in your own `dispose()`.
 - Everything a source returns is cleaned before it's shown: text is escaped, and only `http(s)` URLs survive.
 - Other commands: `collections.unregister-source { id }`, `collections.list-sources`, `collections.open { source, id? }`.
 - `window.__SIGMA_COLLECTIONS__` is a read-only mirror for the console. The commands are the API.

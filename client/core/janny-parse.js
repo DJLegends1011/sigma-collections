@@ -19,9 +19,23 @@ export function decodeEntities(s) {
 }
 
 // an href's slug, entities decoded, any query or fragment cut (an entity like &#x27; carries a #, so decode first)
-const cutQuery = (raw) => decodeEntities(raw).split(/[?#]/)[0];
-const stripComments = (h) => String(h || '').replace(/<!--[\s\S]*?-->/g, '');
-const text = (h) => decodeEntities(String(h || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+const pdec = (v) => { try { return decodeURIComponent(v); } catch { return v; } };
+const cutQuery = (raw) => pdec(decodeEntities(raw).split(/[?#]/)[0]);
+// comments out by indexOf, not a lazy regex: an unclosed <!-- would make the regex rescan the page per match
+function stripComments(h) {
+    const s = String(h || '');
+    let out = '';
+    let i = 0;
+    for (;;) {
+        const a = s.indexOf('<!--', i);
+        if (a < 0) return out + s.slice(i);
+        out += s.slice(i, a);
+        const b = s.indexOf('-->', a + 4);
+        if (b < 0) return out;
+        i = b + 3;
+    }
+}
+const text = (h) => decodeEntities(String(h || '').replace(/<[^>]{0,2000}>/g, ' ')).replace(/\s+/g, ' ').trim();
 const abs = (u) => {
     const v = decodeEntities(String(u || '').trim());
     if (!v) return '';
@@ -29,7 +43,7 @@ const abs = (u) => {
     return v.startsWith('/') ? ORIGIN + v : '';
 };
 const attr = (tag, name) => {
-    const m = new RegExp(`\\s${name}="([^"]*)"`, 'i').exec(tag);
+    const m = new RegExp(`\\s${name}="([^"]{0,2000})"`, 'i').exec(tag);
     return m ? m[1] : '';
 };
 
@@ -47,7 +61,8 @@ function blocks(html, startRe) {
     const re = new RegExp(startRe.source, 'g' + startRe.flags.replace('g', ''));
     let m;
     while ((m = re.exec(html))) starts.push(m.index);
-    for (let i = 0; i < starts.length; i++) out.push(html.slice(starts[i], starts[i + 1] ?? html.length));
+    // a card is a few KB; capping it keeps every scan below linear in the page, whatever the page holds
+    for (let i = 0; i < starts.length; i++) out.push(html.slice(starts[i], Math.min(starts[i + 1] ?? html.length, starts[i] + 40000)));
     return out;
 }
 
@@ -56,7 +71,7 @@ export function parseCollectionList(html) {
     const items = [];
     const seen = new Set();
     for (const card of blocks(h, /<div class="relative inline-flex flex-col rounded-lg/)) {
-        const link = new RegExp(`<a[^>]*href="/collections/(${UUID})_([^"]*)"[^>]*>([\\s\\S]*?)</a>`, 'i').exec(card);
+        const link = new RegExp(`<a[^>]{0,300}href="/collections/(${UUID})_([^"]{0,2000})"[^>]{0,2000}>([\\s\\S]{0,4000}?)</a>`, 'i').exec(card);
         if (!link) continue;
         const [, id, slugRaw, inner] = link;
         const slug = cutQuery(slugRaw);
@@ -64,10 +79,10 @@ export function parseCollectionList(html) {
         seen.add(id);
         const { title, count } = splitTitle(inner);
         const updated = /Last updated:\s*([0-9/]+)/i.exec(text(card));
-        const descM = /<p class="mt-4[^"]*"[^>]*>([\s\S]*?)<\/p>/i.exec(card);
-        const covers = [...card.matchAll(/<img[^>]*class="h-14 w-14[^"]*"[^>]*>/gi)].map(m => abs(attr(m[0], 'src'))).filter(Boolean).slice(0, 5);
-        const cur = /<a[^>]*href="\/collectors\/([^"]*)"[^>]*>([\s\S]*?)<\/a>/i.exec(card);
-        const curAvatar = /<img[^>]*class="h-6 w-6 rounded-full"[^>]*>/i.exec(card);
+        const descM = /<p class="mt-4[^"]{0,2000}"[^>]{0,2000}>([\s\S]{0,4000}?)<\/p>/i.exec(card);
+        const covers = [...card.matchAll(/<img[^>]{0,2000}class="h-14 w-14[^"]{0,2000}"[^>]{0,2000}>/gi)].map(m => abs(attr(m[0], 'src'))).filter(Boolean).slice(0, 5);
+        const cur = /<a[^>]{0,2000}href="\/collectors\/([^"]{0,2000})"[^>]{0,2000}>([\s\S]{0,4000}?)<\/a>/i.exec(card);
+        const curAvatar = /<img[^>]{0,2000}class="h-6 w-6 rounded-full"[^>]{0,2000}>/i.exec(card);
         const views = /<strong>\s*([\d,]+)\s*<\/strong>\s*views/i.exec(card);
         items.push({
             id: `${id}_${slug}`,
@@ -75,7 +90,7 @@ export function parseCollectionList(html) {
             description: descM ? text(descM[1]) : '',
             count,
             covers,
-            curator: cur ? { name: text(cur[2]), url: abs(`/collectors/${encodeURIComponent(decodeEntities(cur[1]).trim())}`), avatar: curAvatar ? abs(attr(curAvatar[0], 'src')) : '' } : null,
+            curator: cur ? { name: text(cur[2]), url: abs(`/collectors/${encodeURIComponent(pdec(decodeEntities(cur[1]).trim()))}`), avatar: curAvatar ? abs(attr(curAvatar[0], 'src')) : '' } : null,
             updatedAt: updated ? updated[1] : '',
             views: views ? parseInt(views[1].replace(/,/g, ''), 10) : null,
             url: `${ORIGIN}/collections/${id}_${encodeURIComponent(slug)}`,
@@ -83,7 +98,7 @@ export function parseCollectionList(html) {
     }
     // the pager's highest page number
     let totalPages = 1;
-    for (const m of h.matchAll(/href="(\/collections\/?\?[^"]*)"/g)) {
+    for (const m of h.matchAll(/href="(\/collections\/?\?[^"]{0,2000})"/g)) {
         const pm = /[?&]page=(\d+)/.exec(decodeEntities(m[1]));
         if (pm) totalPages = Math.max(totalPages, parseInt(pm[1], 10));
     }
@@ -92,32 +107,32 @@ export function parseCollectionList(html) {
 
 export function parseCollectionPage(html) {
     const h = stripComments(html);
-    const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(h);
+    const h1 = /<h1[^>]{0,2000}>([\s\S]{0,4000}?)<\/h1>/i.exec(h);
     let title = '';
     let curator = null;
     if (h1) {
         const before = h1[1].split(/<span/i)[0];
         title = text(before);
-        const cur = /<a[^>]*href="\/collectors\/([^"]*)"[^>]*>([\s\S]*?)<\/a>/i.exec(h1[1]);
-        const av = /<img[^>]*src="([^"]*)"/i.exec(h1[1]);
-        if (cur) curator = { name: text(cur[2]), url: abs(`/collectors/${encodeURIComponent(decodeEntities(cur[1]).trim())}`), avatar: av ? abs(av[1]) : '' };
+        const cur = /<a[^>]{0,2000}href="\/collectors\/([^"]{0,2000})"[^>]{0,2000}>([\s\S]{0,4000}?)<\/a>/i.exec(h1[1]);
+        const av = /<img[^>]{0,2000}src="([^"]{0,2000})"/i.exec(h1[1]);
+        if (cur) curator = { name: text(cur[2]), url: abs(`/collectors/${encodeURIComponent(pdec(decodeEntities(cur[1]).trim()))}`), avatar: av ? abs(av[1]) : '' };
     }
     const updated = /Last updated:\s*([0-9/]+)/i.exec(text(h.slice(h1?.index ?? 0, (h1?.index ?? 0) + 4000)));
-    const descM = /<div class="markdown[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i.exec(h);
+    const descM = /<div class="markdown[^"]{0,2000}"[^>]{0,2000}>([\s\S]{0,20000}?)<\/div>\s*<\/div>/i.exec(h);
     const members = [];
     const seen = new Set();
-    for (const card of blocks(h, new RegExp(`<a[^>]*href="/characters/${UUID}_`, 'i'))) {
-        const head = new RegExp(`^<a[^>]*href="/characters/(${UUID})_([^"]*)"`, 'i').exec(card);
+    for (const card of blocks(h, new RegExp(`<a[^>]{0,300}href="/characters/${UUID}_`, 'i'))) {
+        const head = new RegExp(`^<a[^>]{0,300}href="/characters/(${UUID})_([^"]{0,2000})"`, 'i').exec(card);
         if (!head) continue;
         const [, id, slugRaw] = head;
         if (seen.has(id)) continue;
         seen.add(id);
         const body = card.split(/<\/a>/i)[0];
-        const img = /<img[^>]*src="(https:\/\/image\.jannyai\.com\/[^"]*)"[^>]*>/i.exec(body);
+        const img = /<img[^>]{0,2000}src="(https:\/\/image\.jannyai\.com\/[^"]{0,2000})"[^>]{0,2000}>/i.exec(body);
         const alt = img ? decodeEntities(attr(img[0], 'alt')).replace(/^Avatar of\s+/i, '') : '';
-        const h5 = /<h5[^>]*>([\s\S]*?)<\/h5>/i.exec(body);
+        const h5 = /<h5[^>]{0,2000}>([\s\S]{0,4000}?)<\/h5>/i.exec(body);
         const tok = /Token:\s*(\d+)\s*\/\s*(\d+)/i.exec(body);
-        const tags = [...body.matchAll(/<li[^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>\s*<\/li>/gi)].map(m => text(m[1]));
+        const tags = [...body.matchAll(/<li[^>]{0,500}>\s*<span[^>]{0,500}>([^<]{0,200})<\/span>\s*<\/li>/gi)].map(m => text(m[1]));
         const slug = cutQuery(slugRaw);
         members.push({
             providerId: 'jannyai',

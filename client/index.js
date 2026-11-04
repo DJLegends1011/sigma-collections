@@ -13,6 +13,7 @@ import { mountView } from './view.js';
 
 const VIEW = 'ext:collections/collections';
 let registry = null;
+let view = null;
 
 export default {
     init(ctx) {
@@ -20,11 +21,11 @@ export default {
         registry.add(datacatSource(ctx));
         registry.add(jannySource(ctx));
 
-        ctx.commands.register('register-source', (spec) => registry.add(spec), { title: 'Collections: register a collection source' });
-        ctx.commands.register('unregister-source', ({ id } = {}) => registry.remove(String(id || '')), { title: 'Collections: remove a collection source' });
+        // a caller's own word for owner is namespaced, so no one can pass as the hub and replace a built-in source
+        ctx.commands.register('register-source', (spec) => registry.add({ ...(spec || {}), owner: `ext:${String(spec?.owner || 'unknown').slice(0, 60)}` }), { title: 'Collections: register a collection source' });
+        ctx.commands.register('unregister-source', ({ id } = {}) => registry.remove(String(id || ''), { protect: 'collections' }), { title: 'Collections: remove a collection source' });
         ctx.commands.register('list-sources', () => registry.list().map(s => ({ id: s.id, label: s.label, icon: s.icon, providerId: s.providerId })), { title: 'Collections: list sources' });
 
-        let view = null;
         let pendingOpen = null;
         ctx.commands.register('open', async ({ source, id } = {}) => {
             pendingOpen = { source: source ? String(source) : null, id: id ? String(id) : null };
@@ -64,6 +65,8 @@ export default {
     },
 
     dispose() {
+        view?.dispose();
+        view = null;
         delete window.__SIGMA_COLLECTIONS__;
         registry = null;
     },

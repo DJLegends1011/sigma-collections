@@ -41,10 +41,16 @@ export function findSigmaRoot(start = path.dirname(fileURLToPath(import.meta.url
 
 export async function registerJannyConsumer() {
     try {
-        const root = findSigmaRoot();
-        if (!root) throw new Error('could not find the Project Σ install');
+        const found = findSigmaRoot();
+        if (!found) throw new Error('could not find the Project Σ install');
+        // the real path, so the import resolves to the very module the host loaded (one consumer registry)
+        const root = fs.realpathSync.native(found);
         const mod = await import(pathToFileURL(path.join(root, 'server', 'services', 'browser-service.js')).href);
         if (typeof mod.registerBrowserConsumer !== 'function') throw new Error('this Σ version has no registerBrowserConsumer');
+        // the host registers its own jannyai consumer before extensions mount: a copy of the module would not have it
+        if (typeof mod.browserConsumerIds === 'function' && !mod.browserConsumerIds().includes('jannyai')) {
+            throw new Error('loaded a second copy of the browser service, not the host\'s');
+        }
         mod.registerBrowserConsumer({ id: JANNY_CONSUMER, origin: 'https://jannyai.com', fetchPrefix: '/collections/', warmPath: '/collections/' });
         janny.available = true;
         janny.reason = '';
@@ -81,24 +87,31 @@ function httpError(statusCode, message) {
 export function register(router, ctx) {
     const tokenOf = ctx.helpers.sessionSlot('collections-datacat');
     const feedCache = new Map(); // userHandle -> { at, items }
+    const minting = new Map();   // userHandle -> the one token request in flight
+    const drain = async (resp) => { try { await resp.body?.cancel(); } catch { /* already read or gone */ } };
 
     registerJannyConsumer().then(st => { if (!st.available) console.warn(`[collections] ${st.reason}`); });
 
     async function dcFetch(req, pathAndQuery, retry = true) {
         let token = tokenOf.get(req);
-        if (!token) token = await mintToken(req);
+        if (!token) {
+            const k = req.userHandle || '';
+            if (!minting.has(k)) minting.set(k, mintToken(req).finally(() => minting.delete(k)));
+            token = await minting.get(k);
+        }
         const url = new URL(pathAndQuery, datacatBase() + '/');
         if (url.origin !== new URL(datacatBase()).origin) throw httpError(400, 'bad DataCat path');
         const resp = await ctx.helpers.sameHostFetch(url, {
             headers: { 'User-Agent': UA, Accept: 'application/json', Origin: DATACAT_ORIGIN, Referer: DATACAT_ORIGIN + '/', 'X-Session-Token': token },
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
-        if ((resp.status === 401 || resp.status === 403) && retry) {
+        if (resp.status === 401 && retry) {
+            await drain(resp);
             tokenOf.clear(req);
             return dcFetch(req, pathAndQuery, false);
         }
-        if (resp.status === 404) throw httpError(404, 'This DataCat collection is not available.');
-        if (!resp.ok) throw httpError(502, `DataCat answered ${resp.status}`);
+        if (resp.status === 404 || resp.status === 403) { await drain(resp); throw httpError(404, 'This DataCat collection is not available.'); }
+        if (!resp.ok) { await drain(resp); throw httpError(502, `DataCat answered ${resp.status}`); }
         return readJson(resp);
     }
 
@@ -109,32 +122,35 @@ export function register(router, ctx) {
             body: JSON.stringify({ deviceToken: randomUUID() }),
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
-        if (!resp.ok) throw httpError(502, `DataCat refused a session (${resp.status})`);
+        if (!resp.ok) { await drain(resp); throw httpError(502, `DataCat refused a session (${resp.status})`); }
         const data = await readJson(resp);
         if (!data?.success || typeof data.sessionToken !== 'string') throw httpError(502, 'DataCat gave no session');
         tokenOf.set(req, data.sessionToken);
         return data.sessionToken;
     }
 
-    const send = (res, fn) => fn().then(body => res.json(body)).catch(e => {
+    const send = (req, res, fn) => fn().then(body => res.json(body)).catch(e => {
         const code = e.statusCode || (e.name === 'TimeoutError' ? 504 : 502);
-        res.status(code).json({ error: e.statusCode ? e.message : `DataCat could not be reached (${e.message})` });
+        if (!e.statusCode) ctx.debugLog?.(req, 'DataCat failed:', e.message);
+        res.status(code).json({ error: e.statusCode ? e.message : (code === 504 ? 'DataCat took too long to answer' : 'DataCat could not be reached') });
     });
 
     router.get('/status', (req, res) => {
         res.json({ janny: { available: janny.available, reason: janny.reason, consumer: JANNY_CONSUMER } });
     });
 
-    router.get('/datacat/collections', (req, res) => send(res, async () => {
+    router.get('/datacat/collections', (req, res) => send(req, res, async () => {
         const key = req.userHandle || '';
         const hit = feedCache.get(key);
-        if (hit && Date.now() - hit.at < FEED_TTL_MS && req.query.fresh !== '1') return { items: hit.items };
+        // a forced refresh still waits out 20 s, so the button cannot hammer DataCat
+        const fresh = req.query.fresh === '1' && (!hit || Date.now() - hit.at > 20_000);
+        if (hit && Date.now() - hit.at < FEED_TTL_MS && !fresh) return { items: hit.items };
         const items = normalizeFeed(await dcFetch(req, '/api/community/curations'));
         feedCache.set(key, { at: Date.now(), items });
         return { items };
     }));
 
-    router.get('/datacat/collections/:slug', (req, res) => send(res, async () => {
+    router.get('/datacat/collections/:slug', (req, res) => send(req, res, async () => {
         const slug = String(req.params.slug || '');
         if (!DATACAT_SLUG_RE.test(slug)) throw httpError(400, 'bad collection id');
         const enc = encodeURIComponent(slug);

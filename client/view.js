@@ -2,7 +2,7 @@
 // or import the whole collection into a playlist.
 import CoreAPI from '/modules/core-api.js';
 import { cleanCollection, cleanMember } from './core/sources.js';
-import { ownersMap, planImport, chunk, playlistNameFor } from './core/import-plan.js';
+import { ownersMap, planImport, chunk, playlistNameFor, collectionKey } from './core/import-plan.js';
 
 const MEMBER_BATCH = 60;
 const PROBE_CHUNK = 500;
@@ -48,12 +48,15 @@ export function mountView(el, ctx, registry) {
             if (my !== st.token) return;
             st.items = (r?.items || []).map(cleanCollection).filter(Boolean);
             st.totalPages = Number.isFinite(r?.totalPages) ? r.totalPages : (r?.hasMore ? st.page + 1 : st.page);
+            st.listedPage = st.page;
         } catch (e) {
             if (my !== st.token) return;
             st.items = [];
             st.listError = e?.message || String(e);
+        } finally {
+            // a superseded load still lets go of the flag, or the pager stays disabled for good
+            st.listLoading = false;
         }
-        st.listLoading = false;
         paint();
     }
 
@@ -74,7 +77,7 @@ export function mountView(el, ctx, registry) {
                 const empty = v == null || v === '' || (Array.isArray(v) && !v.length);
                 if (!empty || !(k in merged)) merged[k] = v;
             }
-            merged.count = r.total ?? fresh.count ?? seed?.count ?? null;
+            merged.count = [r.total, fresh.count, seed?.count].find(Number.isFinite) ?? null;
             Object.assign(st.detail, {
                 collection: merged,
                 members: (r.members || []).map(m => cleanMember(m, s.providerId)).filter(Boolean),
@@ -167,65 +170,87 @@ export function mountView(el, ctx, registry) {
         return r;
     }
 
-    async function ensurePlaylist(name, description) {
+    // one playlist per collection: remembered by collection, so two collections that share a title never
+    // share a playlist, and a playlist of the user's own with that name is never touched
+    async function ensurePlaylist(key, title, sourceLabel, description) {
         const doc = await CoreAPI.readAnswer(await CoreAPI.apiRequest('/playlists'));
-        const existing = Object.values(doc?.playlists || {}).find(p => String(p?.name || '').trim().toLowerCase() === name.toLowerCase());
-        if (existing) return existing.id;
+        const lists = doc?.playlists || {}; // keyed by id; the entries carry no id of their own
+        const memo = (await ctx.storage.load().catch(() => null)) || {};
+        const known = memo.playlists?.[key];
+        if (known && lists[known]) return { id: known, name: lists[known].name };
+        const taken = new Set(Object.values(lists).map(p => String(p?.name || '').trim().toLowerCase()));
+        let n = 1;
+        let name = playlistNameFor(title, sourceLabel, n);
+        while (taken.has(name.toLowerCase()) && n < 50) name = playlistNameFor(title, sourceLabel, ++n);
         const made = await CoreAPI.readAnswer(await CoreAPI.apiRequest('/playlists', 'POST', { name, description, icon: 'fa-solid fa-layer-group' }));
-        return made.id;
+        const id = made?.id || Object.entries((await CoreAPI.readAnswer(await CoreAPI.apiRequest('/playlists')))?.playlists || {}).find(([, p]) => p?.name === name)?.[0];
+        if (!id) throw new Error('the playlist was not created');
+        memo.playlists = { ...(memo.playlists || {}), [key]: id };
+        await ctx.storage.save(memo).catch(() => {});
+        return { id, name };
     }
 
     async function importAll() {
         const d = st.detail;
         if (!d || st.job) return;
-        if (!providerFor({ providerId: d.source.providerId })) {
-            return toast(`Turn on the ${d.source.label} site under Settings > Online first; its importer brings the characters in.`, 'warning');
-        }
         // every page first, so the playlist holds the whole collection
-        st.job = { total: 0, done: 0, failed: 0, cancelled: false, label: 'Reading the whole collection…' };
+        const job = st.job = { total: 0, done: 0, failed: 0, cancelled: false, label: 'Reading the whole collection…', detail: d };
         paint();
-        while (d.hasMore && !st.job.cancelled) await loadMoreMembers();
-        if (st.job.cancelled) { st.job = null; return paint(); }
-        const { toImport, have, locked } = planImport(d.members, st.owned);
-        const name = playlistNameFor(d.collection?.title, d.source.label);
+        while (d.hasMore && !job.cancelled) await loadMoreMembers();
+        if (job.cancelled || st.job !== job) { if (st.job === job) st.job = null; return paint(); }
+        // what the reader sees is what comes in: hidden NSFW members stay out
+        const shown = showNsfw() ? d.members : d.members.filter(m => !m.nsfw);
+        const hiddenNsfw = d.members.length - shown.length;
+        const { toImport: wanted, have, locked } = planImport(shown, st.owned);
+        // each member goes through its own site's importer; one whose site is off is skipped, by name
+        const offSites = [...new Set(wanted.filter(m => !providerFor(m)).map(m => m.providerId))];
+        const toImport = wanted.filter(m => providerFor(m));
         if (!toImport.length && !have.length) {
             st.job = null;
             paint();
-            return toast(locked.length ? 'Nothing to import: every creator in this collection turned downloads off.' : 'This collection has no characters to import.', 'info');
+            const why = offSites.length ? `turn on ${offSites.join(', ')} under Settings > Online first` : locked.length ? 'every creator in this collection turned downloads off' : 'there are no characters to import';
+            return toast(`Nothing to import: ${why}.`, 'info');
         }
+        const extra = [
+            locked.length ? `${locked.length} whose creators turned downloads off are skipped.` : '',
+            offSites.length ? `${wanted.length - toImport.length} from ${offSites.join(', ')} are skipped (that site is off under Settings > Online).` : '',
+            hiddenNsfw ? `${hiddenNsfw} NSFW ${hiddenNsfw === 1 ? 'one is' : 'ones are'} hidden and left out.` : '',
+            d.note || '',
+        ].filter(Boolean).join(' ');
         const ok = await CoreAPI.showConfirm?.({
             title: 'Import collection',
-            message: `Import ${toImport.length} new character${toImport.length === 1 ? '' : 's'} (${have.length} already in your library) and put all ${toImport.length + have.length} in the playlist "${name}"?${locked.length ? ` ${locked.length} whose creators turned downloads off are skipped.` : ''}${d.note ? ` ${d.note}` : ''}`,
+            message: `Import ${toImport.length} new character${toImport.length === 1 ? '' : 's'} (${have.length} already in your library) and put all ${toImport.length + have.length} in this collection's playlist?${extra ? ` ${extra}` : ''}`,
             confirmLabel: 'Import all',
             cancelLabel: 'Cancel',
         });
-        if (ok !== true) { st.job = null; return paint(); }
+        if (ok !== true || job.cancelled) { if (st.job === job) st.job = null; return paint(); }
         const ids = [...have];
-        Object.assign(st.job, { total: toImport.length, done: 0, label: 'Importing…' });
+        Object.assign(job, { total: toImport.length, done: 0, label: 'Importing…' });
         paint();
         for (const m of toImport) {
-            if (st.job.cancelled) break;
+            if (job.cancelled) break;
             try {
                 const r = await importOne(m, { quiet: true });
                 if (r.id) ids.push(r.id);
-            } catch { st.job.failed += 1; }
-            st.job.done += 1;
+            } catch { job.failed += 1; }
+            job.done += 1;
             paintJob();
         }
-        const cancelled = st.job.cancelled;
+        if (job.disposed) return;
         try {
             if (ids.length) {
-                const pid = await ensurePlaylist(name, `${d.source.label} collection: ${d.collection?.url || d.id}`);
+                const pl = await ensurePlaylist(collectionKey(d.source.id, d.id), d.collection?.title, d.source.label, `${d.source.label} collection: ${d.collection?.url || d.id}`);
                 for (const part of chunk([...new Set(ids)], 5000)) {
-                    await CoreAPI.readAnswer(await CoreAPI.apiRequest(`/playlists/${encodeURIComponent(pid)}/members/apply`, 'POST', { add: part }));
+                    await CoreAPI.readAnswer(await CoreAPI.apiRequest(`/playlists/${encodeURIComponent(pl.id)}/members/apply`, 'POST', { add: part }));
                 }
+                toast(`${job.cancelled ? 'Stopped. ' : ''}${ids.length} character${ids.length === 1 ? '' : 's'} in "${pl.name}"${job.failed ? `, ${job.failed} failed` : ''}.`, job.failed ? 'warning' : 'success');
+            } else {
+                toast(`${job.cancelled ? 'Stopped. ' : ''}Nothing came in${job.failed ? `: ${job.failed} failed` : ''}.`, 'warning');
             }
-            const failed = st.job.failed;
-            toast(`${cancelled ? 'Stopped. ' : ''}${ids.length} character${ids.length === 1 ? '' : 's'} in "${name}"${failed ? `, ${failed} failed` : ''}.`, failed ? 'warning' : 'success');
         } catch (e) {
             toast(`The playlist could not be filled: ${e?.message || e}`, 'error');
         }
-        st.job = null;
+        if (st.job === job) st.job = null;
         paint();
     }
 
@@ -235,16 +260,17 @@ export function mountView(el, ctx, registry) {
         for (const sel of root.querySelectorAll('select')) CoreAPI.initCustomSelect?.(sel);
     }
 
+    // the progress box only: a full repaint per member would wipe whatever the reader is typing
     function paintJob() {
         const box = root.querySelector('[data-coll-job]');
         if (box) box.outerHTML = jobHtml();
-        else paint();
     }
 
     function headerHtml() {
         const s = source();
         const tabs = sources().map(x => {
-            const why = x.available();
+            let why;
+            try { why = x.available(); } catch (e) { why = e?.message || 'unavailable'; }
             return `<button type="button" class="coll-tab${x.id === s?.id ? ' is-on' : ''}" data-act="source" data-id="${esc(x.id)}" ${why !== true ? `title="${esc(why)}"` : ''}>
                 <i class="fa-solid ${esc(x.icon)}" aria-hidden="true"></i> ${esc(x.label)}</button>`;
         }).join('');
@@ -332,7 +358,7 @@ export function mountView(el, ctx, registry) {
                 <span class="coll-item-meta">${m.creator ? `<span>${esc(m.creator)}</span>` : ''}${m.tokens ? `<span>${esc(m.tokens)} tok</span>` : ''}${m.nsfw ? '<span class="coll-pill is-nsfw">NSFW</span>' : ''}</span>
                 <div class="coll-member-acts">
                     <button type="button" class="cl-btn" data-act="preview" data-key="${esc(`${m.providerId}|${m.charId}`)}"><i class="fa-solid fa-eye" aria-hidden="true"></i> Preview</button>
-                    <button type="button" class="cl-btn${owned ? '' : ' cl-btn-primary'}" data-act="import" data-key="${esc(`${m.providerId}|${m.charId}`)}"${owned ? ' disabled' : ''}><i class="fa-solid fa-download" aria-hidden="true"></i> ${owned ? 'Imported' : 'Import'}</button>
+                    <button type="button" class="cl-btn${owned ? '' : ' cl-btn-primary'}" data-act="import" data-key="${key}"${owned || importing.has(`${m.providerId}|${m.charId}`) || st.job ? ' disabled' : ''}><i class="fa-solid fa-download" aria-hidden="true"></i> ${owned ? 'Imported' : importing.has(`${m.providerId}|${m.charId}`) ? 'Importing…' : 'Import'}</button>
                 </div>
             </div>
         </div>`;
@@ -375,12 +401,17 @@ export function mountView(el, ctx, registry) {
     }
 
     // ---------- events ----------
+    const importing = new Set(); // member keys with a single import in flight
     const memberByKey = (key) => st.detail?.members.find(m => `${m.providerId}|${m.charId}` === key) || null;
 
     root.addEventListener('click', async (ev) => {
         const b = ev.target.closest('[data-act]');
         if (!b || !root.contains(b) || b.tagName === 'SELECT' || b.tagName === 'FORM' || b.type === 'checkbox') return;
         const act = b.dataset.act;
+        // an import-all in flight owns the view until it ends or is stopped
+        if (st.job && ['source', 'refresh', 'page', 'open', 'back', 'reopen'].includes(act)) {
+            return toast('Stop the collection import first, or let it finish.', 'info');
+        }
         if (act === 'source') {
             st.sourceId = b.dataset.id;
             ctx.settings.set('lastSource', st.sourceId);
@@ -393,7 +424,7 @@ export function mountView(el, ctx, registry) {
             const seed = st.items.find(c => c.id === b.dataset.id) || null;
             return openCollection(source().id, b.dataset.id, seed);
         }
-        if (act === 'back') { st.token++; st.detail = null; return st.items.length ? paint() : loadList(); }
+        if (act === 'back') { st.token++; st.detail = null; return st.items.length && st.listedPage === st.page ? paint() : loadList(); }
         if (act === 'reopen') return openCollection(st.detail.source.id, st.detail.id, st.detail.collection);
         if (act === 'more') {
             const d = st.detail;
@@ -405,9 +436,11 @@ export function mountView(el, ctx, registry) {
         if (act === 'preview') { const m = memberByKey(b.dataset.key); if (m) return preview(m); return; }
         if (act === 'import') {
             const m = memberByKey(b.dataset.key);
-            if (!m) return;
-            b.disabled = true;
+            if (!m || importing.has(b.dataset.key)) return;
+            importing.add(b.dataset.key);
+            paint();
             try { await importOne(m); } catch (e) { toast(`Could not import "${m.name}": ${e?.message || e}`, 'error'); }
+            importing.delete(b.dataset.key);
             return paint();
         }
         if (act === 'import-all') return importAll();
@@ -440,11 +473,17 @@ export function mountView(el, ctx, registry) {
         refresh() { return st.detail ? openCollection(st.detail.source.id, st.detail.id, st.detail.collection) : loadList({ fresh: true }); },
         openTarget({ source: sid, id } = {}) {
             if (sid && registry.get(sid)) { st.sourceId = sid; Object.assign(st, { page: 1, query: '', sort: '', items: [] }); }
-            if (id) return openCollection(st.sourceId || source().id, id);
+            const s = registry.get(st.sourceId) || source();
+            if (!s) return paint();
+            if (id) return openCollection(s.id, id);
             st.detail = null;
             return loadList();
         },
-        dispose() { offSources(); },
+        dispose() {
+            if (st.job) { st.job.cancelled = true; st.job.disposed = true; }
+            st.token++;
+            offSources();
+        },
         _state: st,
     };
 }

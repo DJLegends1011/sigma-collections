@@ -42,14 +42,20 @@ export function createRegistry() {
     return {
         add(spec) {
             const s = validateSource(spec);
+            const had = sources.get(s.id);
+            // a source belongs to whoever registered it first: no one else replaces it
+            if (had && had.owner !== s.owner) throw new Error(`source "${s.id}" is already registered by ${had.owner || 'another extension'}`);
             sources.set(s.id, s);
             tell();
             return s.id;
         },
-        remove(id) {
-            const had = sources.delete(id);
-            if (had) tell();
-            return had;
+        remove(id, { protect = null } = {}) {
+            const s = sources.get(id);
+            if (!s) return false;
+            if (protect && s.owner === protect) throw new Error(`source "${id}" is built in and cannot be removed`);
+            sources.delete(id);
+            tell();
+            return true;
         },
         removeOwnedBy(owner) {
             let n = 0;

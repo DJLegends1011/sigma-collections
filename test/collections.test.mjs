@@ -59,6 +59,22 @@ test('janny: a full page of 250 is a sample, with no more pages', () => {
     assert.equal(parseCollectionPage(fx('janny-collection.html')).sampled, false);
 });
 
+test('janny: hostile markup cannot stall the parser', () => {
+    const cases = {
+        'unclosed <a': '<a '.repeat(200_000),
+        'unclosed comments': '<!--'.repeat(150_000),
+        'unclosed li/span in a card': `<a href="/characters/00000000-0000-4000-8000-000000000000_x">${'<li><span>'.repeat(60_000)}`,
+        'endless card starts': '<div class="relative inline-flex flex-col rounded-lg"><a href="/collections/'.repeat(8_000),
+    };
+    for (const [name, html] of Object.entries(cases)) {
+        const t = performance.now();
+        parseCollectionPage(html);
+        parseCollectionList(html);
+        const ms = performance.now() - t;
+        assert.ok(ms < 1500, `${name}: ${Math.round(ms)} ms`);
+    }
+});
+
 test('janny: paths stay inside /collections/', () => {
     assert.equal(jannyListPath(), '/collections/');
     assert.equal(jannyListPath({ page: 3, sort: 'popular' }), '/collections/?sort=popular&page=3');
@@ -98,6 +114,12 @@ test('registry: validates and cleans', () => {
     reg.add({ id: 'ok', label: 'OK', icon: 'javascript:alert(1)', list() {}, get() {}, owner: 'me' });
     assert.equal(reg.get('ok').icon, 'fa-layer-group', 'an icon that is not fa-* falls back');
     assert.equal(told, 1);
+    assert.throws(() => reg.add({ id: 'ok', label: 'Mine now', list() {}, get() {}, owner: 'other' }), /already registered/);
+    reg.add({ id: 'ok', label: 'OK 2', list() {}, get() {}, owner: 'me' });
+    assert.equal(reg.get('ok').label, 'OK 2', 'the owner may replace its own source');
+    reg.add({ id: 'core', label: 'Core', list() {}, get() {}, owner: 'collections' });
+    assert.throws(() => reg.remove('core', { protect: 'collections' }), /built in/);
+    assert.equal(reg.remove('core'), true);
     assert.equal(reg.removeOwnedBy('me'), 1);
     assert.equal(reg.list().length, 0);
     assert.equal(validateSource({ id: 'a', label: ' A ', list() {}, get() {}, sorts: [{ value: 'x', label: 'X' }] }).label, 'A');
@@ -124,7 +146,10 @@ test('import plan: owned members are not imported again', () => {
     assert.deepEqual(p.toImport.map(m => m.charId), ['b'], 'a loose match is not ownership; duplicates fold');
     assert.deepEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
     assert.equal(playlistNameFor('  Fav  ', 'JannyAI'), 'Fav (JannyAI)');
-    assert.ok(playlistNameFor('x'.repeat(300), 'JannyAI').length <= 100);
+    assert.equal(playlistNameFor('Fav', 'JannyAI', 2), 'Fav (JannyAI) #2');
+    const long = playlistNameFor('x'.repeat(300), 'JannyAI', 3);
+    assert.ok(long.length <= 100);
+    assert.ok(long.endsWith(' (JannyAI) #3'), 'the title is cut, never the suffix');
 });
 
 // ---------- in Σ ----------
@@ -178,13 +203,13 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
         assert.equal(upstream.identify, 1);
         await ext('/datacat/collections');
         assert.equal(upstream.feed, 1, 'the feed is cached');
-        upstream.reject = 1;
-        const fresh = await ext('/datacat/collections?fresh=1');
-        assert.equal(fresh.status, 200);
-        assert.equal(upstream.identify, 2, 'a refused token is replaced once');
+        await ext('/datacat/collections?fresh=1');
+        assert.equal(upstream.feed, 1, 'a forced refresh within 20 s still reads the cache');
         const slug = feed.body.items[0].id;
+        upstream.reject = 1;
         const det = await ext(`/datacat/collections/${encodeURIComponent(slug)}`);
-        assert.equal(det.status, 200);
+        assert.equal(det.status, 200, JSON.stringify(det.body));
+        assert.equal(upstream.identify, 2, 'a refused token is replaced, and once only for the two parallel reads');
         assert.equal(det.body.members.length, 3);
         assert.equal((await ext('/datacat/collections/bad%20slug')).status, 400);
         assert.equal((await ext('/datacat/collections/missing')).status, 404);
@@ -229,6 +254,13 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
         await waitFor(() => !el.innerHTML.includes('Mia'), 'nsfw hidden');
         assert.ok(el.innerHTML.includes('Bo'));
 
+        // a source cannot take over or remove a built-in one
+        // (the host's command guard logs a throwing extension command and answers nothing)
+        await Promise.resolve(page.registry.runCommand('collections.register-source', { id: 'datacat', label: 'Fake', owner: 'collections', list() {}, get() {} })).catch(() => {});
+        await Promise.resolve(page.registry.runCommand('collections.unregister-source', { id: 'jannyai' })).catch(() => {});
+        const after = await page.registry.runCommand('collections.list-sources');
+        assert.equal(after.find(s => s.id === 'datacat')?.label, 'DataCat', 'the built-in DataCat source was not replaced');
+        assert.ok(after.some(s => s.id === 'jannyai'), 'the built-in JannyAI source was not removed');
         assert.equal(await page.registry.runCommand('collections.unregister-source', { id: 'mock' }), true);
         // ctx.settings.set saves about half a second later; let it land before the server goes
         await new Promise(r => setTimeout(r, 900));
