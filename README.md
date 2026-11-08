@@ -24,15 +24,19 @@ Browse curated character collections from **JannyAI** and **DataCat**, plus any 
 
 **JannyAI's 250 limit:** a JannyAI collection page lists at most 250 characters. For a bigger collection, that's a random 250 that changes on every visit, and the site has no way to page past it. The view says so, and Import all brings in the 250 it got. Running it again later can add more of them to the same playlist.
 
-## How the JannyAI part works (and why it might break)
+## What it reads, writes and sends
 
-Σ's Hosted Browser only lets each registered "consumer" fetch under one path on one site. The built-in `jannyai` consumer is locked to `/characters/`, and extensions have no official way to register their own yet (`browser-service.js` says extension consumers are coming "later").
+- **Reads:** public collection lists, collection pages and member metadata from JannyAI and DataCat; local provider-link ownership, provider availability/settings and playlists to show badges, preview members and avoid duplicate imports.
+- **Writes locally:** Collections' per-user NSFW/source preferences and collection-to-playlist mapping in its own settings/storage. On your import action, Σ's provider importer writes characters to your library, and Collections creates/reuses its own playlist and adds members. Browsing alone does not import characters or change playlists.
+- **Sends:** the server opens an anonymous session at `https://datacat.run/api/liberator/identify` with a random device token, then sends that session token when reading `/api/community/curations` and collection detail/cart-items there. The Hosted Browser sends collection-page requests (including its site cookies/Cloudflare clearance) only under `https://jannyai.com/collections/`. Cover/avatar images load from the image URLs supplied by those sites; preview/import uses the selected site's native Σ provider. No chats, prompts or local character contents are sent by Collections. Third-party sources you register use their own transports.
 
-Until then, this extension's server half loads Σ's internal `server/services/browser-service.js` and registers a `jannyai-collections` consumer for `https://jannyai.com/collections/`. Σ's own guards still apply: only GET/POST, the path must stay under `/collections/` (`../` escapes are refused), and on a multi-user server the managed browser stays owner-only.
+## How the JannyAI part works
 
-The consumer is registered once for the whole server, so while the extension is installed the route will fetch `/collections/` pages for any signed-in account, even one that hasn't switched Collections on. It is read-only and stays under `/collections/`.
+Requires **Project Σ 1.1.3 / extension API 2.7**. The server registers `ctx.browser.consumer({ name: 'jannyai', origin: 'https://jannyai.com', fetchPrefix: '/collections/', warmPath: '/collections/' })`; the client calls `ctx.browser.fetch('jannyai', path, { headers: { Accept: 'text/html' } })`. The host scopes that bare name to `collections:jannyai`. No internal browser module is loaded.
 
-If a Σ update moves that internal function, only the JannyAI source switches off ("unavailable in this Σ version"). DataCat keeps working. A feature request for an official door has been filed with the Σ developer.
+Σ's guards keep fetches on that origin under `/collections/` (including normalized `../` escape checks), and the consumer is available only while the server half is running and the requesting account has Collections enabled. The managed browser remains owner-only on shared servers. Cloudflare failures and rate limits are shown as errors, with Retry-After when supplied; requests are not automatically retried. If consumer registration fails, JannyAI is marked unavailable while DataCat keeps working.
+
+Preview still has a guarded, undocumented dependency on `window.ProviderRegistry`: there is no public command that awaits a provider's character-view initialization. A cold preview rebuilds the native Online pane DOM, resetting the previous provider's search/scroll on its next Online visit, and fires one initial browse request. Warm previews skip activation. If the user switches to Online during activation, Collections does not deactivate the now-visible native view.
 
 ## For extension developers: add your own source
 

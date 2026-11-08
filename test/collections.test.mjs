@@ -9,6 +9,8 @@ import { parseCollectionList, parseCollectionPage, jannyListPath, jannyCollectio
 import { normalizeFeed, normalizeDetail } from '../client/core/datacat-normalize.js';
 import { createRegistry, validateSource, cleanMember, cleanCollection, safeUrl } from '../client/core/sources.js';
 import { ownersMap, planImport, chunk, playlistNameFor } from '../client/core/import-plan.js';
+import { jannySource } from '../client/sources/builtin.js';
+import { register } from '../server/index.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const extDir = path.resolve(here, '..');
@@ -82,6 +84,46 @@ test('janny: paths stay inside /collections/', () => {
         "/collections/a0ec9071-326f-41ff-bc77-8ce8d0437fda_icedphoenix's%20bots%2F..%2Fx?page=2", 'a slash in the slug cannot climb out');
     assert.throws(() => jannyCollectionPath('../characters/x'));
     assert.equal(decodeEntities('a&#38;b&#x27;c&amp;d'), "a&b'c&d");
+});
+
+test('janny: registers through ctx.browser with a collections-only spec', () => {
+    const specs = [], routes = new Map();
+    register({ get: (path, handler) => routes.set(path, handler) }, {
+        helpers: { sessionSlot: () => ({}) },
+        browser: { consumer(spec) { specs.push(spec); return 'collections:jannyai'; } },
+    });
+    assert.deepEqual(specs, [{ name: 'jannyai', origin: 'https://jannyai.com', fetchPrefix: '/collections/', warmPath: '/collections/' }]);
+    let status;
+    routes.get('/status')({}, { json: (value) => { status = value; } });
+    assert.deepEqual(status.janny, { available: true, reason: '', consumer: 'collections:jannyai' });
+});
+
+test('janny: ctx.browser fetch uses the bare name and handles upstream/service failures', async () => {
+    const calls = [];
+    let answer = { status: 200, body: fx('janny-list.html'), retryAfter: '' };
+    let failure;
+    const source = jannySource({
+        server: { call: async () => ({ janny: { available: true } }) },
+        browser: { async fetch(...args) { calls.push(args); if (failure) throw failure; return answer; } },
+    });
+    assert.equal((await source.list()).items.length, 20);
+    assert.deepEqual(calls[0], ['jannyai', '/collections/', { headers: { Accept: 'text/html' } }]);
+    answer = { status: 200, body: fx('janny-collection.html'), retryAfter: '' };
+    const id = 'a0ec9071-326f-41ff-bc77-8ce8d0437fda_test';
+    assert.equal((await source.get(id)).members.length, 3);
+    assert.equal(calls.at(-1)[1], `/collections/${id}`);
+    for (const [status, body, retryAfter, message] of [
+        [403, '', '', /Cloudflare/], [200, '<title>Just a moment', '', /Cloudflare/],
+        [404, '', '', /not available/], [429, '', '60', /Retry-After: 60/],
+        [429, '', '', /Try again later/], [500, '', '', /answered 500/],
+    ]) {
+        answer = { status, body, retryAfter };
+        await assert.rejects(source.list(), message);
+    }
+    for (const error of [new Error('browser service refused'), new DOMException('Cancelled', 'AbortError')]) {
+        failure = error;
+        await assert.rejects(source.list(), (e) => e === error, 'service/abort errors propagate unchanged');
+    }
 });
 
 // ---------- DataCat ----------
@@ -187,14 +229,22 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
         await sigma.session.enable('collections', true);
         const ext = sigma.session.ext('collections');
 
-        // the JannyAI consumer is registered with the host's browser service, locked to /collections/
+        // The official server door registers a namespaced consumer, locked to /collections/.
         const status = await ext('/status');
         assert.equal(status.status, 200);
         assert.equal(status.body.janny.available, true, status.body.janny.reason);
-        const esc = await sigma.session.api('/provider-services/browser/fetch', 'POST', { consumer: 'jannyai-collections', path: '/collections/../characters/x', endpoint: 'http://127.0.0.1:1' });
+        assert.equal(status.body.janny.consumer, 'collections:jannyai');
+        const browserStatus = await sigma.session.api('/provider-services/browser/managed/status');
+        assert.ok(browserStatus.body.consumers.includes(status.body.janny.consumer));
+        const esc = await sigma.session.api('/provider-services/browser/fetch', 'POST', { consumer: status.body.janny.consumer, path: '/collections/../characters/x', endpoint: 'http://127.0.0.1:1' });
         assert.equal(esc.status, 403, 'a ../ out of /collections/ is refused by the host');
-        const out = await sigma.session.api('/provider-services/browser/fetch', 'POST', { consumer: 'jannyai-collections', path: '/characters/x', endpoint: 'http://127.0.0.1:1' });
+        const out = await sigma.session.api('/provider-services/browser/fetch', 'POST', { consumer: status.body.janny.consumer, path: '/characters/x', endpoint: 'http://127.0.0.1:1' });
         assert.equal(out.status, 400);
+        await sigma.session.enable('collections', false);
+        const disabled = await sigma.session.api('/provider-services/browser/fetch', 'POST', { consumer: status.body.janny.consumer, path: '/characters/x' });
+        assert.equal(disabled.status, 404, 'consumer is gated by the requesting account enablement');
+        assert.match(disabled.body.error, /not switched on/);
+        await sigma.session.enable('collections', true);
 
         // DataCat through the server half
         const feed = await ext('/datacat/collections');
@@ -216,6 +266,8 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
 
         // the page: commands, a registered source, the view
         page = await sigma.session.page();
+        // ctx.CoreAPI is the kit's shell stub, not the imported core module; add the provider read it omits.
+        page.CoreAPI.getProvider = (await import(pathToFileURL(path.join(process.env.SIGMA_DIR, 'app/modules/providers/provider-registry.js')).href)).getProvider;
         await page.boot();
         const sources = await page.registry.runCommand('collections.list-sources');
         assert.deepEqual(sources.map(s => s.id).sort(), ['datacat', 'jannyai']);
@@ -264,7 +316,7 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
         await waitFor(() => !el.innerHTML.includes('Mia'), 'nsfw hidden');
         assert.ok(el.innerHTML.includes('Bo'));
 
-        await t.test('cold preview awaits native activation and keeps Close, Import and backdrop wired once', async () => {
+        await t.test('cold preview awaits native activation and keeps Close, Import and backdrop wired once', async (t) => {
             // A cold provider must finish its normal view activation before openPreview.
             // Model JannyAI's init-owned modal controls; run the real registry lifecycle.
             const providers = await import(pathToFileURL(path.join(process.env.SIGMA_DIR, 'app/modules/providers/provider-registry.js')).href);
@@ -305,6 +357,17 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
                 async buildPreviewObject() { return { id: 'm2', name: 'Bo' }; },
                 openPreview() { opened++; modal.hidden = false; },
             };
+            const previousRegistry = Object.getOwnPropertyDescriptor(window, 'ProviderRegistry');
+            const previousManifest = Object.getOwnPropertyDescriptor(window.PROVIDER_MANIFEST, 'mockprov');
+            t.after(() => {
+                providers.deactivateCurrentProvider();
+                if (previousRegistry) Object.defineProperty(window, 'ProviderRegistry', previousRegistry);
+                else delete window.ProviderRegistry;
+                if (previousManifest) Object.defineProperty(window.PROVIDER_MANIFEST, 'mockprov', previousManifest);
+                else delete window.PROVIDER_MANIFEST.mockprov;
+                shell.remove();
+                modal.remove();
+            });
             globalThis.window.PROVIDER_MANIFEST.mockprov = { id: 'mockprov', name: 'Mock' };
             providers.registerProvider(provider);
             globalThis.window.ProviderRegistry = providers;
@@ -330,6 +393,58 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
             assert.ok(el.innerHTML.includes('Bo'), 'Collections detail is retained behind the preview');
             assert.ok(!page.log.commands.some(([name]) => name === 'view.switch'), 'preview stays on Collections, so Close returns to it');
         });
+
+        for (const scenario of ['stale token', 'switched to Online']) {
+            await t.test(`cold preview during activation: ${scenario}`, async (t) => {
+                const { mountView } = await import('../client/view.js');
+                const previousRegistry = Object.getOwnPropertyDescriptor(window, 'ProviderRegistry');
+                const shell = page.dom.createElement('div');
+                shell.innerHTML = '<div id="onlineView" class="hidden"><div id="onlineCharactersPane"></div></div><div id="onlineCharactersFilter"></div>';
+                document.body.appendChild(shell);
+                const target = page.dom.createElement('div');
+                let releaseActivation, opened = 0, parked = 0;
+                const provider = {
+                    id: 'raceprov', supportsInAppPreview: true, browseView: { _initialized: false },
+                    async buildPreviewObject() { return { id: 'race' }; },
+                    openPreview() { opened++; },
+                };
+                window.ProviderRegistry = {
+                    async activateProvider() {
+                        await new Promise(resolve => { releaseActivation = resolve; });
+                        provider.browseView._initialized = true;
+                    },
+                    getActiveProviderId: () => provider.id,
+                    deactivateCurrentProvider() { parked++; },
+                };
+                const registry = createRegistry();
+                registry.add({ id: 'race', label: 'Race', providerId: provider.id,
+                    list: async () => ({ items: [] }),
+                    get: async () => ({ collection: { title: 'Race' }, members: [{ charId: 'race', name: 'Race' }] }),
+                });
+                const view = mountView(target, {
+                    CoreAPI: { ...page.CoreAPI, getProvider: () => provider },
+                    settings: { get: () => undefined },
+                }, registry);
+                t.after(() => {
+                    view.dispose();
+                    shell.remove();
+                    if (previousRegistry) Object.defineProperty(window, 'ProviderRegistry', previousRegistry);
+                    else delete window.ProviderRegistry;
+                });
+                await view.openTarget({ source: 'race', id: 'collection' });
+                const click = target.querySelector('[data-act="preview"]');
+                // mini-DOM dispatch is synchronous; settle activation and its continuations below.
+                click.click();
+                await waitFor(() => releaseActivation, 'race activation started');
+                if (scenario === 'stale token') view._state.token++;
+                else shell.querySelector('#onlineView').classList.remove('hidden');
+                releaseActivation();
+                await waitFor(() => provider.browseView._initialized, 'race activation finished');
+                await new Promise(resolve => setTimeout(resolve, 20));
+                assert.equal(opened, scenario === 'stale token' ? 0 : 1);
+                assert.equal(parked, scenario === 'stale token' ? 1 : 0, 'visible Online must not be deactivated');
+            });
+        }
 
         await t.test('bulk import excludes hidden NSFW members', async () => {
             // Bulk import uses the same SFW filter as the detail.

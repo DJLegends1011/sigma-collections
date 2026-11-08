@@ -1,11 +1,7 @@
 // Collections, server half:
 //  - DataCat community collections through an anonymous DataCat session (read-only, two paths).
-//  - JannyAI's /collections/ pages through the Hosted Browser: registers its own browser consumer with
-//    the host's browser service (an internal door until Σ gives extensions one; see README).
-import fs from 'node:fs';
-import path from 'node:path';
+//  - JannyAI's /collections/ pages through the official ctx.browser Hosted Browser consumer.
 import { randomUUID } from 'node:crypto';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { normalizeFeed, normalizeDetail, DATACAT_SLUG_RE } from '../client/core/datacat-normalize.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -15,50 +11,10 @@ const TIMEOUT_MS = 30_000;
 const FEED_TTL_MS = 5 * 60_000;
 const CART_LIMIT = 1000; // DataCat's own cap for cart-items
 
-export const JANNY_CONSUMER = 'jannyai-collections';
-export const janny = { available: false, reason: 'not registered yet' };
-
 // tests point DataCat at a mock; only honoured where the host already allows private fetches
 function datacatBase() {
     const o = process.env.COLLECTIONS_DATACAT_BASE;
     return o && process.env.CL_ALLOW_PRIVATE_FETCH === 'true' ? o.replace(/\/+$/, '') : DATACAT_ORIGIN;
-}
-
-// the Σ checkout this extension runs in: walk up from here, then the working directory
-export function findSigmaRoot(start = path.dirname(fileURLToPath(import.meta.url))) {
-    const probe = (dir) => fs.existsSync(path.join(dir, 'server', 'services', 'browser-service.js')) && fs.existsSync(path.join(dir, 'package.json'));
-    for (let dir = start, i = 0; i < 8; i++) {
-        if (probe(dir)) return dir;
-        const up = path.dirname(dir);
-        if (up === dir) break;
-        dir = up;
-    }
-    const env = process.env.SIGMA_DIR;
-    if (env && probe(env)) return env;
-    if (probe(process.cwd())) return process.cwd();
-    return null;
-}
-
-export async function registerJannyConsumer() {
-    try {
-        const found = findSigmaRoot();
-        if (!found) throw new Error('could not find the Project Σ install');
-        // the real path, so the import resolves to the very module the host loaded (one consumer registry)
-        const root = fs.realpathSync.native(found);
-        const mod = await import(pathToFileURL(path.join(root, 'server', 'services', 'browser-service.js')).href);
-        if (typeof mod.registerBrowserConsumer !== 'function') throw new Error('this Σ version has no registerBrowserConsumer');
-        // the host registers its own jannyai consumer before extensions mount: a copy of the module would not have it
-        if (typeof mod.browserConsumerIds === 'function' && !mod.browserConsumerIds().includes('jannyai')) {
-            throw new Error('loaded a second copy of the browser service, not the host\'s');
-        }
-        mod.registerBrowserConsumer({ id: JANNY_CONSUMER, origin: 'https://jannyai.com', fetchPrefix: '/collections/', warmPath: '/collections/' });
-        janny.available = true;
-        janny.reason = '';
-    } catch (e) {
-        janny.available = false;
-        janny.reason = `JannyAI collections are unavailable in this Σ version (${e.message})`;
-    }
-    return janny;
 }
 
 async function readJson(resp) {
@@ -90,7 +46,17 @@ export function register(router, ctx) {
     const minting = new Map();   // userHandle -> the one token request in flight
     const drain = async (resp) => { try { await resp.body?.cancel(); } catch { /* already read or gone */ } };
 
-    registerJannyConsumer().then(st => { if (!st.available) console.warn(`[collections] ${st.reason}`); });
+    const janny = { available: false, reason: '', consumer: null };
+    try {
+        janny.consumer = ctx.browser.consumer({
+            name: 'jannyai', origin: 'https://jannyai.com',
+            fetchPrefix: '/collections/', warmPath: '/collections/',
+        });
+        janny.available = true;
+    } catch (e) {
+        janny.reason = `JannyAI collections are unavailable (${e.message})`;
+        console.warn(`[collections] ${janny.reason}`);
+    }
 
     async function dcFetch(req, pathAndQuery, retry = true) {
         let token = tokenOf.get(req);
@@ -136,7 +102,7 @@ export function register(router, ctx) {
     });
 
     router.get('/status', (req, res) => {
-        res.json({ janny: { available: janny.available, reason: janny.reason, consumer: JANNY_CONSUMER } });
+        res.json({ janny });
     });
 
     router.get('/datacat/collections', (req, res) => send(req, res, async () => {

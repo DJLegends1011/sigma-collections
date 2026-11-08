@@ -1,6 +1,5 @@
 // The two sources the hub ships with. Each talks to its site the way Σ already does: DataCat through this
 // extension's server half, JannyAI through the Hosted Browser (consumer registered by the server half).
-import { browserFetch } from '/modules/providers/provider-utils.js';
 import { parseCollectionList, parseCollectionPage, jannyListPath, jannyCollectionPath } from '../core/janny-parse.js';
 
 export function datacatSource(ctx) {
@@ -43,11 +42,12 @@ export function jannySource(ctx) {
     };
     const fetchPage = async (p) => {
         await ensure();
-        const r = await browserFetch('jannyai-collections', p, { headers: { Accept: 'text/html' } });
+        const r = await ctx.browser.fetch('jannyai', p, { headers: { Accept: 'text/html' } });
         if (r.status === 403 || /<title>Just a moment/i.test(r.body || '')) {
             throw new Error('JannyAI is behind Cloudflare and the Hosted Browser did not get through. Check it under Settings > Online > Hosted Browser.');
         }
         if (r.status === 404) throw new Error('This JannyAI collection is not available.');
+        if (r.status === 429) throw new Error(`JannyAI is rate limiting requests.${r.retryAfter ? ` Retry-After: ${r.retryAfter}.` : ' Try again later.'}`);
         if (r.status < 200 || r.status >= 300) throw new Error(`JannyAI answered ${r.status || 'nothing'}`);
         return r.body || '';
     };

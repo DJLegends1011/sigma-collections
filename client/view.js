@@ -1,6 +1,5 @@
 // The Collections view: pick a source, browse its collections, open one, preview / import its members,
 // or import the whole collection into a playlist.
-import CoreAPI from '/modules/core-api.js';
 import { cleanCollection, cleanMember } from './core/sources.js';
 import { ownersMap, planImport, chunk, playlistNameFor, collectionKey } from './core/import-plan.js';
 
@@ -9,7 +8,7 @@ const PROBE_CHUNK = 500;
 
 export function mountView(el, ctx, registry) {
     const esc = (s) => ctx.CoreAPI.escapeHtml(String(s ?? ''));
-    const toast = (msg, type = 'info') => CoreAPI.showToast?.(msg, type);
+    const toast = (msg, type = 'info') => ctx.CoreAPI.showToast?.(msg, type);
 
     const st = {
         sourceId: ctx.settings.get('lastSource') || '',
@@ -127,8 +126,8 @@ export function mountView(el, ctx, registry) {
         for (const [provider, keys] of byProvider) {
             for (const part of chunk(keys, PROBE_CHUNK)) {
                 try {
-                    const resp = await CoreAPI.apiRequest('/provider-links/probe', 'POST', { providers: [provider], keys: part, owners: true });
-                    const body = await CoreAPI.readAnswer(resp);
+                    const resp = await ctx.CoreAPI.apiRequest('/provider-links/probe', 'POST', { providers: [provider], keys: part, owners: true });
+                    const body = await ctx.CoreAPI.readAnswer(resp);
                     for (const [k, v] of ownersMap(body?.owners)) st.owned.set(k, v);
                 } catch { /* badges are a hint; a failed probe just shows none */ }
             }
@@ -137,8 +136,8 @@ export function mountView(el, ctx, registry) {
 
     // ---------- actions ----------
     function providerFor(m) {
-        const p = CoreAPI.getProvider?.(m.providerId);
-        const off = (CoreAPI.getSetting?.('disabledProviders') || []).includes(m.providerId);
+        const p = ctx.CoreAPI.getProvider?.(m.providerId);
+        const off = (ctx.CoreAPI.getSetting?.('disabledProviders') || []).includes(m.providerId);
         return p && !off ? p : null;
     }
 
@@ -147,6 +146,8 @@ export function mountView(el, ctx, registry) {
     // provider-registry.js:activateProvider renders the native panes and awaits activate(),
     // which injects modals then runs init(). JannyAI owns its modal listeners in init().
     // Warm providers need no activation; never attach their listeners ourselves.
+    // Known cost without a public door: cold activation rebuilds the Online pane DOM
+    // (the previous provider's search/scroll reset on its next visit) and fires one initial browse request.
     async function ensurePreviewReady(p) {
         const view = p.browseView;
         if (!view || view._initialized === true) return;
@@ -167,7 +168,10 @@ export function mountView(el, ctx, registry) {
         } finally {
             // Collections stays visible and keeps its detail/scroll state. Park the
             // native view before opening the modal, just as leaving Online would.
-            if (providers.getActiveProviderId() === p.id) providers.deactivateCurrentProvider();
+            const online = document.getElementById('onlineView');
+            if (providers.getActiveProviderId() === p.id && (!online || online.classList.contains('hidden'))) {
+                providers.deactivateCurrentProvider();
+            }
         }
     }
 
@@ -210,7 +214,7 @@ export function mountView(el, ctx, registry) {
     // one playlist per collection: remembered by collection, so two collections that share a title never
     // share a playlist, and a playlist of the user's own with that name is never touched
     async function ensurePlaylist(key, title, sourceLabel, description) {
-        const doc = await CoreAPI.readAnswer(await CoreAPI.apiRequest('/playlists'));
+        const doc = await ctx.CoreAPI.readAnswer(await ctx.CoreAPI.apiRequest('/playlists'));
         const lists = doc?.playlists || {}; // keyed by id; the entries carry no id of their own
         const memo = (await ctx.storage.load().catch(() => null)) || {};
         const known = memo.playlists?.[key];
@@ -219,8 +223,8 @@ export function mountView(el, ctx, registry) {
         let n = 1;
         let name = playlistNameFor(title, sourceLabel, n);
         while (taken.has(name.toLowerCase()) && n < 50) name = playlistNameFor(title, sourceLabel, ++n);
-        const made = await CoreAPI.readAnswer(await CoreAPI.apiRequest('/playlists', 'POST', { name, description, icon: 'fa-solid fa-layer-group' }));
-        const id = made?.id || Object.entries((await CoreAPI.readAnswer(await CoreAPI.apiRequest('/playlists')))?.playlists || {}).find(([, p]) => p?.name === name)?.[0];
+        const made = await ctx.CoreAPI.readAnswer(await ctx.CoreAPI.apiRequest('/playlists', 'POST', { name, description, icon: 'fa-solid fa-layer-group' }));
+        const id = made?.id || Object.entries((await ctx.CoreAPI.readAnswer(await ctx.CoreAPI.apiRequest('/playlists')))?.playlists || {}).find(([, p]) => p?.name === name)?.[0];
         if (!id) throw new Error('the playlist was not created');
         memo.playlists = { ...(memo.playlists || {}), [key]: id };
         await ctx.storage.save(memo).catch(() => {});
@@ -254,7 +258,7 @@ export function mountView(el, ctx, registry) {
             hiddenNsfw ? `${hiddenNsfw} NSFW ${hiddenNsfw === 1 ? 'one is' : 'ones are'} hidden and left out.` : '',
             d.note || '',
         ].filter(Boolean).join(' ');
-        const ok = await CoreAPI.showConfirm?.({
+        const ok = await ctx.CoreAPI.showConfirm?.({
             title: 'Import collection',
             message: `Import ${toImport.length} new character${toImport.length === 1 ? '' : 's'} (${have.length} already in your library) and put all ${toImport.length + have.length} in this collection's playlist?${extra ? ` ${extra}` : ''}`,
             confirmLabel: 'Import all',
@@ -278,7 +282,7 @@ export function mountView(el, ctx, registry) {
             if (ids.length) {
                 const pl = await ensurePlaylist(collectionKey(d.source.id, d.id), d.collection?.title, d.source.label, `${d.source.label} collection: ${d.collection?.url || d.id}`);
                 for (const part of chunk([...new Set(ids)], 5000)) {
-                    await CoreAPI.readAnswer(await CoreAPI.apiRequest(`/playlists/${encodeURIComponent(pl.id)}/members/apply`, 'POST', { add: part }));
+                    await ctx.CoreAPI.readAnswer(await ctx.CoreAPI.apiRequest(`/playlists/${encodeURIComponent(pl.id)}/members/apply`, 'POST', { add: part }));
                 }
                 toast(`${job.cancelled ? 'Stopped. ' : ''}${ids.length} character${ids.length === 1 ? '' : 's'} in "${pl.name}"${job.failed ? `, ${job.failed} failed` : ''}.`, job.failed ? 'warning' : 'success');
             } else {
@@ -294,7 +298,7 @@ export function mountView(el, ctx, registry) {
     // ---------- paint ----------
     function paint() {
         root.innerHTML = st.detail ? detailHtml() : listHtml();
-        for (const sel of root.querySelectorAll('select')) CoreAPI.initCustomSelect?.(sel);
+        for (const sel of root.querySelectorAll('select')) ctx.CoreAPI.initCustomSelect?.(sel);
     }
 
     // the progress box only: a full repaint per member would wipe whatever the reader is typing

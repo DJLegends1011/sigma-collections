@@ -4,7 +4,7 @@
     "version": "0.1.0",
     "author": "DJLegends",
     "description": "Browse curated character collections from JannyAI and DataCat (and any provider extension that registers a source), open members in their site's own preview, and import a whole collection into a playlist.",
-    "requires": { "api": "2.6" },
+    "requires": { "api": "2.7" },
     "client": "client/index.js",
     "server": "server/index.js",
     "style": "client/style.css",
