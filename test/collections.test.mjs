@@ -179,7 +179,7 @@ process.env.CL_ALLOW_PRIVATE_FETCH = 'true';
 process.env.COLLECTIONS_DATACAT_BASE = `http://127.0.0.1:${mock.address().port}`;
 after(() => mock.close());
 
-test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !kitPath && 'no Σ checkout' }, async () => {
+test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !kitPath && 'no Σ checkout' }, async (t) => {
     const { startSigma } = await import(pathToFileURL(kitPath).href);
     const sigma = await startSigma({ extensions: [extDir], prefix: 'collections' });
     let page;
@@ -241,8 +241,18 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
         assert.ok(!el.innerHTML.includes('<img src=x'), 'titles are escaped');
         assert.ok(!el.innerHTML.includes('javascript:'), 'unsafe cover urls are dropped');
         assert.ok(el.innerHTML.includes('Mock &lt;i&gt;'));
-        el.querySelector('[data-act="open"]').click();
-        await waitFor(() => el.innerHTML.includes('Mia'), 'members');
+        await t.test('NSFW defaults to hidden and only an explicit opt-in reveals members', async () => {
+            assert.equal(el.querySelector('[data-act="nsfw"]').checked, false, 'fresh installs default to SFW');
+            assert.match(el.innerHTML, /Show NSFW in Collections/, 'the preference is clearly Collections-only');
+            el.querySelector('[data-act="open"]').click();
+            await waitFor(() => el.innerHTML.includes('Bo'), 'members');
+            assert.ok(!el.innerHTML.includes('Mia'), 'NSFW members are hidden by default');
+            const enableNsfw = el.querySelector('[data-act="nsfw"]');
+            enableNsfw.checked = true;
+            enableNsfw.dispatchEvent({ type: 'change', bubbles: true });
+            await waitFor(() => el.innerHTML.includes('Mia'), 'explicit NSFW opt-in');
+        });
+
         assert.ok(!el.innerHTML.includes('<script>'), 'member names are escaped');
         assert.ok(el.innerHTML.includes('Import all into a playlist'));
         assert.deepEqual(calls.map(c => c[0]), ['list', 'get']);
@@ -253,6 +263,111 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
         sw.dispatchEvent({ type: 'change', bubbles: true });
         await waitFor(() => !el.innerHTML.includes('Mia'), 'nsfw hidden');
         assert.ok(el.innerHTML.includes('Bo'));
+
+        await t.test('cold preview awaits native activation and keeps Close, Import and backdrop wired once', async () => {
+            // A cold provider must finish its normal view activation before openPreview.
+            // Model JannyAI's init-owned modal controls; run the real registry lifecycle.
+            const providers = await import(pathToFileURL(path.join(process.env.SIGMA_DIR, 'app/modules/providers/provider-registry.js')).href);
+            const { BrowseView } = await import(pathToFileURL(path.join(process.env.SIGMA_DIR, 'app/modules/providers/browse-view.js')).href);
+            const shell = page.dom.createElement('div');
+            shell.innerHTML = '<div id="onlineCharactersPane"></div><div id="onlineCharactersFilter"></div>';
+            document.body.appendChild(shell);
+            const modal = page.dom.createElement('div');
+            let initialized = 0, opened = 0, imported = 0, closed = 0;
+            let releaseActivation;
+            class ColdView extends BrowseView {
+                async activate(...args) {
+                    await new Promise(resolve => { releaseActivation = resolve; });
+                    super.activate(...args);
+                }
+                renderView() { return '<div id="mockGrid"></div>'; }
+                renderFilterBar() { return ''; }
+                injectModals() {
+                    if (this._modalsInjected) return;
+                    this._modalsInjected = true;
+                    modal.innerHTML = '<button data-close>Close</button><button data-import>Import</button>';
+                    document.body.appendChild(modal);
+                }
+                init() {
+                    super.init();
+                    initialized++;
+                    modal.querySelector('[data-close]').addEventListener('click', () => { closed++; modal.hidden = true; });
+                    modal.querySelector('[data-import]').addEventListener('click', () => imported++);
+                    modal.addEventListener('click', (ev) => { if (ev.target === modal) { closed++; modal.hidden = true; } });
+                }
+                // The mini-DOM has no scrolling/layout; neither is needed for this regression.
+                _attachScrollListener() {}
+                creatorDownloadEnabled() { return false; }
+            }
+            const browseView = new ColdView({ id: 'mockprov' });
+            const provider = {
+                id: 'mockprov', name: 'Mock', browseView, supportsInAppPreview: true,
+                async buildPreviewObject() { return { id: 'm2', name: 'Bo' }; },
+                openPreview() { opened++; modal.hidden = false; },
+            };
+            globalThis.window.PROVIDER_MANIFEST.mockprov = { id: 'mockprov', name: 'Mock' };
+            providers.registerProvider(provider);
+            globalThis.window.ProviderRegistry = providers;
+            const previewButton = () => el.querySelector('[data-act="preview"][data-key="mockprov|m2"]');
+            previewButton().click();
+            previewButton().click();
+            await waitFor(() => releaseActivation, 'provider activation started');
+            assert.equal(opened, 0, 'preview waits for asynchronous provider activation');
+            releaseActivation();
+            await waitFor(() => opened === 1, 'cold preview');
+            assert.equal(initialized, 1, 'cold preview initializes the owning provider');
+            modal.querySelector('[data-import]').click();
+            modal.querySelector('[data-close]').click();
+            assert.equal(imported, 1, 'Import is wired by provider init');
+            assert.equal(closed, 1, 'Close is wired by provider init');
+            previewButton().click();
+            await waitFor(() => opened === 2, 'warm preview');
+            modal.click();
+            assert.equal(closed, 2, 'backdrop is wired');
+            modal.querySelector('[data-import]').click();
+            assert.equal(imported, 2, 'no duplicate Import listeners on repeat preview');
+            assert.equal(initialized, 1, 'warm preview does not repeat init');
+            assert.ok(el.innerHTML.includes('Bo'), 'Collections detail is retained behind the preview');
+            assert.ok(!page.log.commands.some(([name]) => name === 'view.switch'), 'preview stays on Collections, so Close returns to it');
+        });
+
+        await t.test('bulk import excludes hidden NSFW members', async () => {
+            // Bulk import uses the same SFW filter as the detail.
+            const importedMembers = [];
+            const local = await sigma.session.importCard({ name: 'Collections SFW bulk fixture' });
+            page.registry.defineCommand('character.import', async (args) => {
+                importedMembers.push(args.id);
+                return { success: true, id: local.id };
+            });
+            el.querySelector('[data-act="import-all"]').click();
+            await waitFor(() => page.log.confirms.some(c => c.title === 'Import collection'), 'bulk confirmation');
+            const confirm = page.log.confirms.find(c => c.title === 'Import collection');
+            assert.match(confirm.message, /1 new character/);
+            assert.match(confirm.message, /1 NSFW one is hidden and left out/);
+            await waitFor(() => importedMembers.length > 0 && !el.querySelector('[data-coll-job]'), 'SFW bulk import finished');
+            assert.deepEqual(importedMembers, ['m2'], 'hidden NSFW member is not imported');
+        });
+
+        await t.test('saved NSFW opt-in is preserved on remount', async () => {
+            // Explicit saved opt-in survives a remount; no migration resets it to the new default.
+            const optIn = el.querySelector('[data-act="nsfw"]');
+            optIn.checked = true;
+            optIn.dispatchEvent({ type: 'change', bubbles: true });
+            await new Promise(r => setTimeout(r, 900));
+            const { mountView } = await import('../client/view.js');
+            const saved = await sigma.session.api('/settings');
+            assert.equal(saved.body['ext:collections:showNsfw'], true);
+            const remountRegistry = createRegistry();
+            remountRegistry.add({ id: 'saved', label: 'Saved', list() { return { items: [] }; }, get() {} });
+            const remountEl = page.dom.createElement('div');
+            const remounted = mountView(remountEl, {
+                CoreAPI: page.CoreAPI,
+                settings: { get: (key) => saved.body[`ext:collections:${key}`] },
+            }, remountRegistry);
+            await remounted.openTarget();
+            assert.equal(remountEl.querySelector('[data-act="nsfw"]').checked, true);
+            remounted.dispose();
+        });
 
         // a source cannot take over or remove a built-in one
         // (the host's command guard logs a throwing extension command and answers nothing)

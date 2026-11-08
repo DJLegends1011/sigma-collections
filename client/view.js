@@ -8,7 +8,7 @@ const MEMBER_BATCH = 60;
 const PROBE_CHUNK = 500;
 
 export function mountView(el, ctx, registry) {
-    const esc = (s) => CoreAPI.escapeHtml(String(s ?? ''));
+    const esc = (s) => ctx.CoreAPI.escapeHtml(String(s ?? ''));
     const toast = (msg, type = 'info') => CoreAPI.showToast?.(msg, type);
 
     const st = {
@@ -31,7 +31,7 @@ export function mountView(el, ctx, registry) {
 
     const sources = () => registry.list();
     const source = () => registry.get(st.sourceId) || sources()[0] || null;
-    const showNsfw = () => ctx.settings.get('showNsfw') !== false;
+    const showNsfw = () => ctx.settings.get('showNsfw') === true;
 
     // ---------- data ----------
     async function loadList({ fresh = false } = {}) {
@@ -142,6 +142,36 @@ export function mountView(el, ctx, registry) {
         return p && !off ? p : null;
     }
 
+    // No public command targets + awaits a provider's character view (view.switch only
+    // accepts a shell view). Keep this guarded, undocumented registry dependency here:
+    // provider-registry.js:activateProvider renders the native panes and awaits activate(),
+    // which injects modals then runs init(). JannyAI owns its modal listeners in init().
+    // Warm providers need no activation; never attach their listeners ourselves.
+    async function ensurePreviewReady(p) {
+        const view = p.browseView;
+        if (!view || view._initialized === true) return;
+        const providers = window.ProviderRegistry;
+        const pane = document.getElementById('onlineCharactersPane');
+        const filters = document.getElementById('onlineCharactersFilter');
+        if (typeof providers?.activateProvider !== 'function' ||
+            typeof providers?.deactivateCurrentProvider !== 'function' ||
+            typeof providers?.getActiveProviderId !== 'function' || !pane || !filters) {
+            throw new Error('the site preview is not ready; open its Online tab first');
+        }
+        try {
+            await providers.activateProvider(p.id, pane, filters, { kind: 'characters' });
+            // The registry catches activation failures, so check completion ourselves.
+            if (view._initialized !== true || providers.getActiveProviderId() !== p.id) {
+                throw new Error('the site preview could not be initialized');
+            }
+        } finally {
+            // Collections stays visible and keeps its detail/scroll state. Park the
+            // native view before opening the modal, just as leaving Online would.
+            if (providers.getActiveProviderId() === p.id) providers.deactivateCurrentProvider();
+        }
+    }
+
+    let previewPending = false;
     async function preview(m) {
         if (m.locked) { if (m.url) window.open(m.url, '_blank', 'noopener'); return; }
         const p = providerFor(m);
@@ -150,13 +180,20 @@ export function mountView(el, ctx, registry) {
             if (!p) toast(`Turn on the ${m.providerId} site under Settings > Online to preview in the app; opened it on the site instead.`, 'info');
             return;
         }
+        if (previewPending) return;
+        previewPending = true;
+        const token = st.token;
         try {
             const obj = await p.buildPreviewObject({ name: m.name, data: {} }, { id: m.charId, fullPath: m.importId });
             if (!obj) throw new Error('not found on the site');
-            p.browseView?.injectModals?.();
-            p.openPreview(obj);
+            if (token !== st.token) return;
+            await ensurePreviewReady(p);
+            if (token !== st.token) return;
+            await p.openPreview(obj);
         } catch (e) {
             toast(`Could not preview "${m.name}": ${e?.message || e}`, 'error');
+        } finally {
+            previewPending = false;
         }
     }
 
@@ -280,7 +317,7 @@ export function mountView(el, ctx, registry) {
             <h2 class="coll-title"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Collections</h2>
             <div class="coll-tabs" role="tablist">${tabs}</div>
             <div class="coll-bar">${search}${sorts}
-                <label class="coll-switch"><input type="checkbox" class="cl-switch-input" data-act="nsfw"${showNsfw() ? ' checked' : ''}><span class="cl-switch" aria-hidden="true"></span><span>Show NSFW</span></label>
+                <label class="coll-switch"><input type="checkbox" class="cl-switch-input" data-act="nsfw"${showNsfw() ? ' checked' : ''}><span class="cl-switch" aria-hidden="true"></span><span>Show NSFW in Collections</span></label>
                 <button type="button" class="cl-btn coll-icon-btn" data-act="refresh" title="Refresh"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
             </div>
         </header>`;
@@ -387,7 +424,7 @@ export function mountView(el, ctx, registry) {
             <div class="coll-bar">
                 <button type="button" class="cl-btn cl-btn-primary" data-act="import-all"${st.job || d.loading ? ' disabled' : ''}><i class="fa-solid fa-list-check" aria-hidden="true"></i> Import all into a playlist</button>
                 ${c.url ? `<a class="cl-btn" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open on ${esc(d.source.label)}</a>` : ''}
-                <label class="coll-switch"><input type="checkbox" class="cl-switch-input" data-act="nsfw"${showNsfw() ? ' checked' : ''}><span class="cl-switch" aria-hidden="true"></span><span>Show NSFW</span></label>
+                <label class="coll-switch"><input type="checkbox" class="cl-switch-input" data-act="nsfw"${showNsfw() ? ' checked' : ''}><span class="cl-switch" aria-hidden="true"></span><span>Show NSFW in Collections</span></label>
             </div>
             ${d.note ? `<p class="coll-card coll-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> ${esc(d.note)}</p>` : ''}
             ${jobHtml()}

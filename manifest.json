@@ -9,7 +9,7 @@
     "server": "server/index.js",
     "style": "client/style.css",
     "settings": {
-        "showNsfw": true,
+        "showNsfw": false,
         "lastSource": ""
     },
     "contributes": ["app.action", "shell.view"]
