@@ -446,6 +446,50 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
             });
         }
 
+        for (const scenario of ['registry internals missing', 'activation does not complete', 'activation throws']) {
+            await t.test(`cold preview fails safe: ${scenario}`, async (t) => {
+                const { mountView } = await import('../client/view.js');
+                const previousRegistry = Object.getOwnPropertyDescriptor(window, 'ProviderRegistry');
+                const shell = page.dom.createElement('div');
+                shell.innerHTML = '<div id="onlineView" class="hidden"><div id="onlineCharactersPane"></div></div><div id="onlineCharactersFilter"></div>';
+                document.body.appendChild(shell);
+                const target = page.dom.createElement('div');
+                let opened = 0;
+                const toasts = [];
+                const provider = {
+                    id: 'safeprov', supportsInAppPreview: true, browseView: { _initialized: false },
+                    async buildPreviewObject() { return { id: 'safe' }; },
+                    openPreview() { opened++; },
+                };
+                if (scenario === 'registry internals missing') delete window.ProviderRegistry;
+                else window.ProviderRegistry = {
+                    async activateProvider() { if (scenario === 'activation throws') throw new Error('boom'); },
+                    getActiveProviderId: () => null,
+                    deactivateCurrentProvider() {},
+                };
+                const registry = createRegistry();
+                registry.add({ id: 'safe', label: 'Safe', providerId: provider.id,
+                    list: async () => ({ items: [] }),
+                    get: async () => ({ collection: { title: 'Safe' }, members: [{ charId: 'safe', name: 'Safe' }] }),
+                });
+                const view = mountView(target, {
+                    CoreAPI: { ...page.CoreAPI, getProvider: () => provider, showToast: (msg, type) => toasts.push([msg, type]) },
+                    settings: { get: () => undefined },
+                }, registry);
+                t.after(() => {
+                    view.dispose();
+                    shell.remove();
+                    if (previousRegistry) Object.defineProperty(window, 'ProviderRegistry', previousRegistry);
+                    else delete window.ProviderRegistry;
+                });
+                await view.openTarget({ source: 'safe', id: 'collection' });
+                target.querySelector('[data-act="preview"]').click();
+                await waitFor(() => toasts.length, 'fail-safe toast');
+                assert.equal(opened, 0, 'a cold preview with dead controls is never opened');
+                assert.deepEqual(toasts[0], ['Open this site in the Online tab once, then try the preview again.', 'info']);
+            });
+        }
+
         await t.test('bulk import excludes hidden NSFW members', async () => {
             // Bulk import uses the same SFW filter as the detail.
             const importedMembers = [];

@@ -141,30 +141,38 @@ export function mountView(el, ctx, registry) {
         return p && !off ? p : null;
     }
 
-    // No public command targets + awaits a provider's character view (view.switch only
-    // accepts a shell view). Keep this guarded, undocumented registry dependency here:
-    // provider-registry.js:activateProvider renders the native panes and awaits activate(),
-    // which injects modals then runs init(). JannyAI owns its modal listeners in init().
-    // Warm providers need no activation; never attach their listeners ourselves.
-    // Known cost without a public door: cold activation rebuilds the Online pane DOM
-    // (the previous provider's search/scroll reset on its next visit) and fires one initial browse request.
-    async function ensurePreviewReady(p) {
-        const view = p.browseView;
-        if (!view || view._initialized === true) return;
+    // STOPGAP — the only place this extension touches Σ internals for previews.
+    // Σ 1.1.3 has no documented door to get a provider's preview ready (docs/extensions.d.ts has no
+    // provider-activation API; view.switch only takes shell views). Some providers (JannyAI) wire the
+    // preview's Close/Import/backdrop in their view init, so a cold preview opens with dead controls.
+    // This reads the private p.browseView._initialized and calls the undocumented
+    // window.ProviderRegistry.activateProvider / deactivateCurrentProvider / getActiveProviderId
+    // (app/modules/providers/provider-registry.js). Replace it once Σ ships an official door
+    // (feature request drafted 2026-11-08). Fail safe: if any internal is missing or activation
+    // does not complete, answer a reason for a toast instead of throwing.
+    // Known cost: cold activation rebuilds the Online pane DOM (the previous provider's search/scroll
+    // reset on its next visit) and fires one initial browse request.
+    const OPEN_ONLINE_FIRST = 'Open this site in the Online tab once, then try the preview again.';
+    async function stopgapReadyProviderPreview(p) {
+        const view = p?.browseView;
+        if (!view || view._initialized === true) return { ok: true };
         const providers = window.ProviderRegistry;
         const pane = document.getElementById('onlineCharactersPane');
         const filters = document.getElementById('onlineCharactersFilter');
         if (typeof providers?.activateProvider !== 'function' ||
             typeof providers?.deactivateCurrentProvider !== 'function' ||
             typeof providers?.getActiveProviderId !== 'function' || !pane || !filters) {
-            throw new Error('the site preview is not ready; open its Online tab first');
+            return { ok: false, reason: OPEN_ONLINE_FIRST };
         }
         try {
             await providers.activateProvider(p.id, pane, filters, { kind: 'characters' });
             // The registry catches activation failures, so check completion ourselves.
             if (view._initialized !== true || providers.getActiveProviderId() !== p.id) {
-                throw new Error('the site preview could not be initialized');
+                return { ok: false, reason: OPEN_ONLINE_FIRST };
             }
+            return { ok: true };
+        } catch {
+            return { ok: false, reason: OPEN_ONLINE_FIRST };
         } finally {
             // Collections stays visible and keeps its detail/scroll state. Park the
             // native view before opening the modal, just as leaving Online would.
@@ -191,8 +199,9 @@ export function mountView(el, ctx, registry) {
             const obj = await p.buildPreviewObject({ name: m.name, data: {} }, { id: m.charId, fullPath: m.importId });
             if (!obj) throw new Error('not found on the site');
             if (token !== st.token) return;
-            await ensurePreviewReady(p);
+            const ready = await stopgapReadyProviderPreview(p);
             if (token !== st.token) return;
+            if (!ready.ok) { toast(ready.reason, 'info'); return; }
             await p.openPreview(obj);
         } catch (e) {
             toast(`Could not preview "${m.name}": ${e?.message || e}`, 'error');
