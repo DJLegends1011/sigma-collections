@@ -67,7 +67,6 @@ try { await add(); } catch { ctx.events.on('ext:collections:ready', add); }   //
 - Unregister your source in your own `dispose()`.
 - Everything a source returns is cleaned before it's shown: text is escaped, and only `http(s)` URLs survive.
 - Other commands: `collections.unregister-source { id }`, `collections.list-sources`, `collections.open { source, id? }`.
-- `window.__SIGMA_COLLECTIONS__` is a read-only mirror for the console. The commands are the API.
 
 ## Tests
 

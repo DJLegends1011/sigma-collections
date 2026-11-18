@@ -279,7 +279,6 @@ test('in Σ: server routes, JannyAI consumer, commands and the view', { skip: !k
             async get(id) { calls.push(['get', id]); return { collection: { title: 'Evil' }, members: [{ charId: 'm1', name: '<script>x</script>Mia', nsfw: true }, { charId: 'm2', name: 'Bo' }], hasMore: false }; },
         });
         assert.ok((await page.registry.runCommand('collections.list-sources')).some(s => s.id === 'mock'));
-        assert.equal(globalThis.window.__SIGMA_COLLECTIONS__.apiVersion, 1);
 
         const views = page.host.getViews().map(v => v.name || v);
         assert.ok(views.some(v => String(v).includes('collections')), `view registered: ${JSON.stringify(views)}`);
