@@ -6,7 +6,6 @@
 //   ctx.commands.run('collections.list-sources')              -> [{ id, label, icon, providerId }]
 //   ctx.commands.run('collections.open', { source, id? })     -> opens the view (on a collection when id is given)
 //   ctx.events.on('ext:collections:ready', ...)                -> fired when the hub is up (register then, if you loaded first)
-// window.__SIGMA_COLLECTIONS__ mirrors the read-only parts for console use; the commands are the API.
 import { createRegistry } from './core/sources.js';
 import { datacatSource, jannySource } from './sources/builtin.js';
 import { mountView } from './view.js';
@@ -55,19 +54,12 @@ export default {
             refresh: () => view?.refresh(),
         });
 
-        window.__SIGMA_COLLECTIONS__ = Object.freeze({
-            apiVersion: 1,
-            sources: () => registry.list().map(s => ({ id: s.id, label: s.label, providerId: s.providerId })),
-            commands: Object.freeze(['collections.register-source', 'collections.unregister-source', 'collections.list-sources', 'collections.open']),
-        });
-
         ctx.events.emit('ready', { apiVersion: 1 });
     },
 
     dispose() {
         view?.dispose();
         view = null;
-        delete window.__SIGMA_COLLECTIONS__;
         registry = null;
     },
 };
